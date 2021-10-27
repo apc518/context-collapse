@@ -244,7 +244,7 @@ function setup(){
   // check in with the server every 30 seconds to keep our game token alive
   checkinInterval = setInterval(() => {
     if(authToken){
-        fetch(`${serverURLBase}/context-collapse-checkin`, {
+      fetch(`${serverURLBase}/context-collapse-checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
