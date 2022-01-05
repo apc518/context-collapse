@@ -187,7 +187,6 @@ function setup(){
 
   const volumeControl = document.getElementById("volumeSlider");
   volumeControl.onchange = e => {
-    e.stopPropagation();
     Howler.volume(e.target.value / 100);
   }
 

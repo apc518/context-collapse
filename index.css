@@ -54,6 +54,7 @@ a:hover{
     flex-direction: column;
     align-items: center;
     width: 60px;
+    user-select: none;
 }
 
 #volumeSlider {
