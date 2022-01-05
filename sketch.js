@@ -190,6 +190,15 @@ function setup(){
     Howler.volume(e.target.value / 100);
   }
 
+  // alert the user if their screen isnt big enough to hold the whole canvas
+  if(window.innerHeight < canvasHeight) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Zoom out',
+      text: 'Your screen is too small to fit the whole canvas at base resolution. Zoom out until you can see the bottom edge of the canvas.'
+    });
+  }
+
   initAgnosticGlobalVars();
 
   enemyGroup = new Group();
