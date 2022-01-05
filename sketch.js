@@ -60,6 +60,8 @@ const killallSpawnVariance = 20 * FRAMERATE;
 const freezeSpawnPeriodAvg = 50 * FRAMERATE;
 const freezeSpawnVariance = 10 * FRAMERATE;
 
+const allSounds = [];
+
 let difficultyData;
 let difficultyString;
 let difficultyColor;
@@ -180,7 +182,14 @@ function loadSound(path, vol=1){
 }
 
 function setup(){
-  createCanvas(canvasWidth, canvasHeight);
+  let canvas = createCanvas(canvasWidth, canvasHeight);
+  canvas.parent("p5_canvas");
+
+  const volumeControl = document.getElementById("volumeSlider");
+  volumeControl.onchange = e => {
+    e.stopPropagation();
+    Howler.volume(e.target.value / 100);
+  }
 
   initAgnosticGlobalVars();
 
