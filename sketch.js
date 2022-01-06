@@ -190,7 +190,7 @@ function setup(){
     Howler.volume(e.target.value / 100);
   }
   // initial volume
-  Howler.volume(50);
+  Howler.volume(0.5);
 
   // alert the user if their screen isnt big enough to hold the whole canvas
   let bodyStyle = getComputedStyle(document.body);
@@ -1292,26 +1292,31 @@ function cleanup(){
  */
 function mousePressed(){
   if(gameState === PLAYING && playerArrows > 0){
-    var arrow = createSprite(player.position.x, player.position.y);
-    arrow.addImage(arrowImage);
-    arrow.scale = 0.35;
-    
-    // calculate rotation, default points NE
-    var x_diff = mouseX - player.position.x;
-    var y_diff = mouseY - player.position.y;
-    var true_theta = Math.atan(y_diff / x_diff);
-    var theta = 45 + true_theta * 180 / Math.PI;
-    if(mouseX < player.position.x){
-      theta += 180;
+    if(mouseX < canvasWidth && mouseX >= 0 && mouseY < canvasHeight && mouseY >= 0){
+      var arrow = createSprite(player.position.x, player.position.y);
+      arrow.addImage(arrowImage);
+      arrow.scale = 0.35;
+      
+      // calculate rotation, default points NE
+      var x_diff = mouseX - player.position.x;
+      var y_diff = mouseY - player.position.y;
+      var true_theta = Math.atan(y_diff / x_diff);
+      var theta = 45 + true_theta * 180 / Math.PI;
+      if(mouseX < player.position.x){
+        theta += 180;
+      }
+      arrow.rotation = theta;
+      
+      arrow.attractionPoint(playerArrowSpeed, mouseX, mouseY);
+      arrow.debug = debugSprites;
+      arrow.setCollider("rectangle", 0, 0, 20, 20);
+      arrows.add(arrow);
+      playerArrows--;
+      if(sfxOn) twangSfx.play();
     }
-    arrow.rotation = theta;
-    
-    arrow.attractionPoint(playerArrowSpeed, mouseX, mouseY);
-    arrow.debug = debugSprites;
-    arrow.setCollider("rectangle", 0, 0, 20, 20);
-    arrows.add(arrow);
-    playerArrows--;
-    if(sfxOn) twangSfx.play();
+    else{
+      setGameState(PAUSED);
+    }
   }
 }
 
