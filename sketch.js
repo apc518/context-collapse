@@ -1313,6 +1313,9 @@ function doKillall(){
         if(damageEnemy(boss, null) != null) break;
       }
     }
+    
+    score -= Math.floor((bossGroupCopy.length - enemyBossGroup.length) * 1.5); // subtract half the points gained from the big monsters
+
     killallEquipped = false;
   }
 }
