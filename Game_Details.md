@@ -88,7 +88,7 @@ Enemies spawn in a random location in the game, only they cannot spawn within 25
 
 Each time an enemy spawns, there is some chance that it will be a big monster. If it is not a big monster, it will be a small monster as there are only two types of monsters.
 
-The chance that an enemy is _not_ a monster is multiplied by 0.998 each time a monster is spawned, starting once the spawn interval has reached its minimum.
+The chance that an enemy is _not_ a big monster is multiplied by 0.998 each time a monster is spawned, starting once the spawn interval has reached its minimum.
 
 All of the parameters surrounding enemy spawning that are dependant on difficulty are contained within difficulty.json.
 
