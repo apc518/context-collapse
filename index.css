@@ -39,6 +39,16 @@ a:hover{
     color: white;
 }
 
+.game-details{
+    font-size: 1.125em;
+    color: #0cc;
+    position: inherit;
+}
+
+.game-details:hover{
+    color: #a0a;
+}
+
 #p5_loading{
     animation-name: loadingAnimation;
     animation-duration: 1s;

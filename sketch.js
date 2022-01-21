@@ -508,8 +508,9 @@ function setupStartScreen(){
       title: "How To Play",
       html: `
       Move with WASD, shoot by clicking.<br/><br/>
-      There are two powerup slots which can be activated by the Q and E keys respectively.<br/>
-      1 and 2, F and G, and X and C also work.
+      There are two powerup slots which can be activated by the Q and E keys respectively.<br/><br/>
+      <a class="game-details" href="https://github.com/apc518/context-collapse/blob/master/Game_Details.md" target="_blank" rel="noreferrer">More Details</a>
+      <br/>
       `
     }).then(() => {
       clickablesDisabled = false;
