@@ -83,7 +83,10 @@ const enemyHealthMax = 20;
 const enemyBossRateMultiplier = 0.998; // this will only activate after the enemySpawnPeriod has reached its minimum.
 
 const serverURLBase = "https://chambercode-back.herokuapp.com";
+// const serverURLBase = "http://localhost:5000";
 let leaderboardError = false;
+let leaderboardLoading = false;
+let leaderboardPage = 1; // leaderboard pages are 1-indexed (not 0-indexed)
 let networkError = false;
 let authToken;
 
@@ -523,7 +526,7 @@ function setupStartScreen(){
 function setupLeaderboard(){
   backBtn = new Clickable();
   backBtn.resize(170, 60);
-  backBtn.locate(canvasWidth / 2 - backBtn.width / 2, canvasHeight / 2 + 100);
+  backBtn.locate(canvasWidth / 2 - backBtn.width / 2, canvasHeight / 2 + 150);
   backBtn.text = "Back";
   backBtn.textSize = 24;
   backBtn.textFont = globalFont;
@@ -537,6 +540,33 @@ function setupLeaderboard(){
   backBtn.onOutside = () => {
     backBtn.color = "#fff";
   }
+
+  const PAGE_BUTTON_WIDTH = 40;
+  const PAGE_BUTTON_HEIGHT = 40;
+
+  const setupPageButton = (btn, text, xPos, increment) => {
+    btn.resize(PAGE_BUTTON_WIDTH, PAGE_BUTTON_HEIGHT);
+    btn.locate(xPos, canvasHeight / 2 + 60);
+    btn.text = text;
+    btn.textSize = 32;
+    btn.textFont = globalFont;
+    btn.onHover = () => {
+      btn.color = "#ffc";
+    }
+    btn.onOutside = () => {
+      btn.color = "#fff";
+    }
+    btn.onPress = () => {
+      leaderboardPage = Math.max(1, leaderboardPage + increment);
+      fetchLeaderboard();
+    }
+  }
+
+  pageForwardBtn = new Clickable();
+  setupPageButton(pageForwardBtn, ">", canvasWidth / 2, 1);
+
+  pageBackBtn = new Clickable();
+  setupPageButton(pageBackBtn, "<", canvasWidth / 2 - PAGE_BUTTON_WIDTH, -1);
 }
 
 function setupGameOverScreen(){
@@ -797,6 +827,13 @@ function drawLeaderboard(){
   }
 
   backBtn.draw();
+  pageForwardBtn.draw();
+  pageBackBtn.draw();
+  
+  fill(255);
+  textAlign(CENTER);
+  textSize(24);
+  text(`Page ${leaderboardPage}${leaderboardLoading ? '...' : ''}`, canvasWidth / 2, canvasHeight / 2 + 40)
   pop();
 }
 
@@ -895,7 +932,8 @@ function wrangleCoords(x, y){
 function fetchLeaderboard(){
   showingLeaderboard = true;
   leaderboardError = false;
-  fetch(`${serverURLBase}/leaderboard`)
+  leaderboardLoading = true;
+  fetch(`${serverURLBase}/leaderboard?page=${leaderboardPage}`)
     .then(res => {
       res.json().then(data => {
         leaderboard = data;
@@ -906,6 +944,9 @@ function fetchLeaderboard(){
       console.error("Error loading leaderboard");
       console.error(e);
       leaderboardError = true;
+    })
+    .finally(() => {
+      leaderboardLoading = false;
     });
 }
 
