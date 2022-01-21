@@ -80,7 +80,8 @@ const enemyBossHealthMax = 80;
 const enemyHealthMax = 20;
 
 // chance that a boss DOESN'T spawn is multiplied by this every time a monster spawns
-const enemyBossRateMultiplier = 0.998; // this will only activate after the enemySpawnPeriod has reached its minimum.
+// this will only activate after the enemySpawnPeriod has reached its minimum.
+const enemyBossRateMultiplier = 0.998;
 
 const serverURLBase = "https://chambercode-back.herokuapp.com";
 // const serverURLBase = "http://localhost:5000";
@@ -150,9 +151,8 @@ function initAgnosticGlobalVars(){
   leaderboard = null;
 }
 
-/**
- * P5 FUNCTIONS
- */
+
+/// P5 FUNCTIONS
 function preload(){
   playerImage = loadImage("images/character-head-128.png");
   playerDeadImage = loadImage("images/character-head-dead-128.png");
@@ -231,7 +231,11 @@ function setup(){
   playerDamageSfx = loadSound("audio/heavy_sound_1.wav", 0.2);
   playerDeathSfx = loadSound("audio/death_2.wav");
   healthPackSfx = loadSound("audio/health_bottle_3.wav");
-  menuClickSfx = loadSound("audio/ma-scissors-02.wav", 0.5);
+  menuClickSfx = loadSound("audio/collider-boom-clave.wav", 0.5);
+
+  if(!('highscores' in localStorage)){
+    localStorage['highscores'] = JSON.stringify({easy: 0, normal: 0, hard: 0});
+  }
 
   $.getJSON("./difficulty.json", function(data){
     difficultyData = data;
@@ -343,9 +347,8 @@ function draw(){
   drawSettingsIcon();
 }
 
-/**
- * SPECIFIC SETUP FUNCTIONS
- */
+
+/// SPECIFIC SETUP FUNCTIONS
 function setupSettingsIcon(){
   settingsButton = new Clickable();
   settingsButton.locate(canvasWidth - 52, canvasHeight - 52);
@@ -557,6 +560,8 @@ function setupLeaderboard(){
       btn.color = "#fff";
     }
     btn.onPress = () => {
+      if(leaderboardPage + increment < 1) return;
+      if(sfxOn) menuClickSfx.play();
       leaderboardPage = Math.max(1, leaderboardPage + increment);
       fetchLeaderboard();
     }
@@ -596,14 +601,27 @@ function setupGameOverScreen(){
   submitScoreBtnDisabled.color = "#666"; // grayed out
 
   restartBtn = new Clickable();
-  restartBtn.locate(canvasWidth / 2 - 80, canvasHeight / 2 + 130);
-  restartBtn.resize(160, 60);
-  restartBtn.text = "Restart";
+  restartBtn.locate(canvasWidth / 2 - 90, canvasHeight / 2 + 130);
+  restartBtn.resize(180, 60);
+  restartBtn.text = "Back to Title";
   restartBtn.textSize = 24;
   restartBtn.textFont = globalFont;
   restartBtn.onPress = () => {
     if(sfxOn) menuClickSfx.play();
-    resetLevel();
+    clickablesDisabled = true;
+    Swal.fire({
+      title: gameIsOver ? "Are you sure you want to exit?" : "Are you sure you want to quit?",
+      text: gameIsOver ? (score > getHighScore() ? "You won't be able to submit this high score." : "") : "You will lose all progress from this round.",
+      showCancelButton: true,
+      confirmButtonText: "Yes",
+      focusCancel: true
+    }).then(res => {
+      clickablesDisabled = false;
+      if (res.isConfirmed) {
+        resetLevel();
+      }
+    })
+    // resetLevel();
   }
   restartBtn.onHover = () => {
     restartBtn.color = "#ffc";
@@ -613,9 +631,8 @@ function setupGameOverScreen(){
   }
 }
 
-/**
- * DRAWING FUNCTIONS
- */
+
+/// DRAWING FUNCTIONS
 function drawStartScreen(){
   textSize(72);
   fill("#ffff88");
@@ -684,6 +701,11 @@ function drawStats(){
   fill("white");
   textAlign(LEFT)
   text("Score: " + score, 8, 32);
+  push();
+  textSize(16);
+  fill(difficultyColor);
+  text("High: " + getHighScore(), 8, 52);
+  pop();
 
   // Arrow Count
   textAlign(CENTER);
@@ -716,8 +738,17 @@ function drawGameOverScreen(){
     textSize(48);
     textAlign(CENTER);
     text("Final score: " + score, canvasWidth / 2, canvasHeight / 2);
-    if(!networkError) submitScoreBtn.draw();
-    else submitScoreBtnDisabled.draw();
+
+    if(networkError){
+      submitScoreBtnDisabled.draw();
+    }
+    else if (score > getHighScore()){
+      fill("#ff8");
+      textSize(36)
+      text("New High Score!", canvasWidth / 2, canvasHeight / 2 - 70);
+      submitScoreBtn.draw();
+    }
+
     restartBtn.draw();
     pop();
 }
@@ -863,9 +894,8 @@ function assignImages(){
   }
 }
 
-/**
- * PLAYER CONTROLS
- */
+
+/// PLAYER CONTROLS
 function incrementVelocity(){
   let x = 0;
   let y = 0;
@@ -921,9 +951,8 @@ function playerControls(){
   player.position.y += playerSpeedY;
 }
 
-/**
- * UTILITY
- */
+
+/// UTILITY
 function wrangleCoords(x, y){
   // returns coordinates that are always inside of the canvas
   return [mod(x, canvasWidth), mod(y, canvasHeight)];
@@ -952,23 +981,47 @@ function fetchLeaderboard(){
 
 function submitHighScore(){
   clickablesDisabled = true;
+  let name = "";
+  if ('name' in localStorage){
+    name = localStorage.name;
+  }
   Swal.fire({
-    title: `Enter your name and submit your score of ${score}`,
+    title: name.length > 0 ? `Congrats ${name}! Submit your new high score of ${score}` : `Enter your name and submit your score of ${score}`,
+    text: 'Enter a new name if you wish to change it',
     input: 'text',
+    inputValue: name.length > 0 ? name : '',
     showCancelButton: true,
     confirmButtonText: 'Submit Score',
     showLoaderOnConfirm: true,
-    preConfirm: name => {
+    preConfirm: newName => {
+      // store name in localStorage. Try to get it from there, or create it for the first time
+      if (newName.length > 0) {
+        localStorage['name'] = newName;
+      }
+
+      // store scoreToken in localStorage. Try to get it from there, or create it for the first time
+      let scoreToken;
+      if ("scoreToken" in localStorage){
+        scoreToken = localStorage.scoreToken;
+      }
+      else{
+        let arr = new Uint8Array(32);
+        window.crypto.getRandomValues(arr);
+        scoreToken = Array.from(arr, dec => dec.toString(16)).join('');
+        localStorage['scoreToken'] = scoreToken;
+      }
+
       return fetch(`${serverURLBase}/leaderboard`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          name: name,
+          name: localStorage.name,
           score: score,
           difficulty: difficultyString.toLowerCase(),
-          token: authToken
+          token: authToken,
+          scoreToken: scoreToken
         })
       })
       .then(res => {
@@ -1018,9 +1071,24 @@ function toggleLegacySfx(){
   }
 }
 
-/**
- * SPAWNING
- */
+function updateHighscore(){
+  // set highscore according to current value of difficultyString
+  if(!difficultyString) return;
+
+  let highscores = JSON.parse(localStorage.highscores);
+  highscores[difficultyString.toLowerCase()] = Math.max(highscores[difficultyString.toLowerCase()], score);
+  localStorage.highscores = JSON.stringify(highscores);
+}
+
+function getHighScore(){
+  if(!difficultyString) return;
+
+  let highscores = JSON.parse(localStorage.highscores);
+  return highscores[difficultyString.toLowerCase()];
+}
+
+
+/// SPAWNING
 function spawnKillallAbility(){
   if(killallAbilityPrevSpawn + killallAbilitySpawnPeriod <= gameFrame && killallEmbargo < gameFrame){
     var killallAbility = createSprite(Math.random() * canvasWidth, Math.random() * canvasHeight);
@@ -1126,9 +1194,8 @@ function createMonster(x, y){
   }
 }
 
-/**
- * MONSTER MOVEMENT
- */
+
+/// MONSTER MOVEMENT
 function attractMonsters(){
   if(!freezing){
     for(var i = 0; i < enemyGroup.length; i++){
@@ -1153,9 +1220,8 @@ function pauseMonsters(){
   }
 }
 
-/**
- * COLLISIONS AND COLLISION HANDLERS
- */
+
+/// COLLISIONS AND COLLISION HANDLERS
 function collisions(){
   enemyGroup.overlap(arrows, damageEnemy);
   enemyBossGroup.overlap(arrows, damageEnemy);
@@ -1258,14 +1324,13 @@ function doFreeze(){
   }
 }
 
-/**
- * GAMESTATE FUNCTIONS
- */
+
+/// GAMESTATE FUNCTIONS
 function gameOver(){
   if(gameIsOver){
     return;
   }
-  setGameState(PAUSED)
+  setGameState(PAUSED);
   playerHealth = 0;
   gameIsOver = true;
   player.addImage(playerDeadImage);
@@ -1273,6 +1338,9 @@ function gameOver(){
 }
 
 function resetLevel(){
+  // set new highscore
+  updateHighscore();
+
   // intialize agnostic globals again
   initAgnosticGlobalVars();
 
@@ -1298,7 +1366,7 @@ function registerGame(difficulty, data){
     })
     .catch(e => {
       networkError = true;
-      console.log("Playing offline: will not be able to submit highscore.");
+      console.log("Playing offline: will not be able to submit highscores.");
       clickablesDisabled = true;
       Swal.fire({
         title: "Playing in offline mode.\nYou will not be able to submit a high score.",
@@ -1339,9 +1407,8 @@ function setGameState(state){
   gameStateFuncs[state]();
 }
 
-/**
- * CLEANUP (prevent memory leaks from arrows flying off the screen)
- */
+
+/// CLEANUP (prevent memory leaks from arrows flying off the screen)
 function cleanup(){
   for(var i = 0; i < allSprites.length; i++){
     var x = allSprites[i].position.x;
@@ -1352,9 +1419,8 @@ function cleanup(){
   }
 }
 
-/**
- * EVENTS
- */
+
+/// INPUT EVENTS
 function mousePressed(){
   if(gameState === PLAYING && playerArrows > 0){
     if(mouseX < canvasWidth && mouseX >= 0 && mouseY < canvasHeight && mouseY >= 0){
