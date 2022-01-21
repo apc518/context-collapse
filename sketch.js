@@ -15,16 +15,18 @@ const PLAYING = 1;
 const PAUSED = 2;
 
 const gameStateFuncs = {
-  0: () => frameRate(20),
-  1: () => { pauseScreen = false; frameRate(60); },
-  2: () => frameRate(20)
+  0: () => frameRate(SLOW_FRAMERATE),
+  1: () => { pauseScreen = false; frameRate(FRAMERATE); },
+  2: () => frameRate(SLOW_FRAMERATE)
 };
 
 const FRAMERATE = 60;
+const SLOW_FRAMERATE = 20;
 
 // canvas
 const canvasHeight = 800;
 const canvasWidth = canvasHeight;
+let p5canvas;
 
 const globalFont = "Trebuchet MS";
 
@@ -182,8 +184,8 @@ function loadSound(path, vol=1){
 }
 
 function setup(){
-  let canvas = createCanvas(canvasWidth, canvasHeight);
-  canvas.parent("p5_canvas");
+  p5canvas = createCanvas(canvasWidth, canvasHeight);
+  p5canvas.parent("p5_canvas");
 
   const volumeControl = document.getElementById("volumeSlider");
   volumeControl.onchange = e => {
@@ -413,7 +415,7 @@ function setupFreezeTimer(){
 }
 
 function setupStartScreen(){
-  frameRate(20);
+  frameRate(SLOW_FRAMERATE);
 
   easyBtn = new Clickable();
   easyBtn.locate(canvasWidth / 2 - 150, canvasHeight / 2);
@@ -734,31 +736,50 @@ function drawLeaderboard(){
   fill(0, 0, 0, 127);
   rect(0, 0, canvasWidth, canvasHeight);
 
-  textAlign(CENTER);
-  textSize(24);
+  textAlign(LEFT);
+  textSize(20);
   
   try{
     easyLeaderboardString = "EASY:\n";
+
+    const truncated = (newLine) => {
+      // measure the line, then
+      // while it is too wide, chop off the last four characters and replace with three dots
+      const tempCanvas = document.createElement('canvas');
+      const ctx = tempCanvas.getContext("2d");
+      ctx.font = globalFont;
+      let metrics = ctx.measureText(newLine);
+      while (metrics.width > (canvasWidth / 6)){
+        newLine = newLine.slice(0, -4); // chop of last 4 characters
+        newLine += "...";
+        metrics = ctx.measureText(newLine);
+      }
+      return newLine;
+    }
+
     for(let i = 0; i < leaderboard.easy.length && i < 10; i++){
-      easyLeaderboardString += `${leaderboard.easy[i].name}: ${leaderboard.easy[i].score}\n`
+      let newLine = truncated(`${leaderboard.easy[i].score} - ${leaderboard.easy[i].name}`)
+      easyLeaderboardString += `${newLine}\n`;
     }
     
     normalLeaderboardString = "NORMAL:\n";
     for(let i = 0; i < leaderboard.normal.length && i < 10; i++){
-      normalLeaderboardString += `${leaderboard.normal[i].name}: ${leaderboard.normal[i].score}\n`
+      normalLeaderboardString += `${leaderboard.normal[i].score} - ${leaderboard.normal[i].name}\n`
     }
     
     hardLeaderboardString = "HARD:\n";
     for(let i = 0; i < leaderboard.hard.length && i < 10; i++){
-      hardLeaderboardString += `${leaderboard.hard[i].name}: ${leaderboard.hard[i].score}\n`
+      hardLeaderboardString += `${leaderboard.hard[i].score} - ${leaderboard.hard[i].name}\n`
     }
+
+    const alignBias = canvasWidth / 6 - 10;
     
     fill(difficultyData.easy.color);
-    text(easyLeaderboardString, canvasWidth / 6, 80);
+    text(easyLeaderboardString, canvasWidth / 6 - alignBias, 80);
     fill(difficultyData.normal.color);
-    text(normalLeaderboardString, canvasWidth / 2, 80);
+    text(normalLeaderboardString, canvasWidth / 2 - alignBias, 80);
     fill(difficultyData.hard.color);
-    text(hardLeaderboardString, canvasWidth - canvasWidth / 6, 80);
+    text(hardLeaderboardString, canvasWidth - canvasWidth / 6 - alignBias, 80);
   }
   catch(e){
     if(leaderboardError){
@@ -907,15 +928,18 @@ function submitHighScore(){
       })
       .then(res => {
         if (!res.ok){
-          throw new Error(res.statusText);
+          Swal.showValidationMessage(
+            `Error: ${res.statusText}`
+          )
+          return "";
         }
-        return res.json();
+        else{
+          return res.json();
+        }
       })
-      .catch(err => {
-        Swal.showValidationMessage(
-          `Error: ${err.message}`
-        )
-      })
+    },
+    didDestroy: () => {
+      clickablesDisabled = false;
     }
   }).then((res) => {
     if(res.isConfirmed){
