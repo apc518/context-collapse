@@ -1251,7 +1251,7 @@ function damageEnemy(enemy, arrow){
     enemy.addImage(bossDamageImages[idx]);
   }
 
-  if(arrow != null){
+  if(arrow !== null){
     arrows.remove(arrow);
     arrow.remove();
     if(sfxOn){
@@ -1297,17 +1297,20 @@ function equipFreeze(freeze){
   freezeEquipped = true;
 }
 
-/**
- * POWERUP EXECUTION
- */
+/// POWERUP EXECUTION
 function doKillall(){
   if(killallEquipped){
     if(sfxOn) killallSfx.play();
     score += Math.floor((enemyGroup.length) / 2);
     while(enemyGroup.length > 0) enemyGroup[0].remove();
-    for(var i = 0; i < enemyBossGroup.length; i++) {
+
+    let bossGroupCopy = [];
+    for(let eb of enemyBossGroup){
+      bossGroupCopy.push(eb);
+    }
+    for(let boss of bossGroupCopy) {
       for(var k = 0; k < Math.floor(enemyBossHealthMax / playerStrength) - 1; k++){
-        if(damageEnemy(enemyBossGroup[i], null) != null) break;
+        if(damageEnemy(boss, null) != null) break;
       }
     }
     killallEquipped = false;
