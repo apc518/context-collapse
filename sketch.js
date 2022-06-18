@@ -94,7 +94,13 @@ let authToken;
 let sweetAlerting = false;
 
 let sfxOn = true;
+let musicOn = true;
 let useLegacySfx = false;
+
+// button constants
+const btnHoverColor = "#ffc";
+const btnDefaultColor = "#fff";
+
 
 class MetaObj{
   constructor(health=0, strength=10, value=1, boss=false){
@@ -168,6 +174,8 @@ function preload(){
   settingsImage = loadImage("images/gear-1.png");
   sfxOnIcon = loadImage("images/volume_on.png");
   sfxOffIcon = loadImage("images/volume_off.png");
+  musicOnIcon = loadImage("images/music_on.png");
+  musicOffIcon = loadImage("images/music_off.png");
 
   bossDamageImages = [];
   for(let i = 4; i >= 0; i--) bossDamageImages.push(loadImage("images/enemy-boss-" + i + ".png"));
@@ -191,11 +199,11 @@ function setup(){
   p5canvas.parent("p5_canvas");
 
   const volumeControl = document.getElementById("volumeSlider");
-  volumeControl.onchange = e => {
-    Howler.volume(e.target.value / 100);
+  volumeControl.oninput = e => {
+    Howler.volume(volumeControl.value / 100);
   }
   // initial volume
-  Howler.volume(0.5);
+  Howler.volume(volumeControl.value / 100);
 
   // alert the user if their screen isnt big enough to hold the whole canvas
   let bodyStyle = getComputedStyle(document.body);
@@ -232,6 +240,8 @@ function setup(){
   playerDeathSfx = loadSound("audio/death_2.wav");
   healthPackSfx = loadSound("audio/health_bottle_3.wav");
   menuClickSfx = loadSound("audio/collider-boom-clave.wav", 0.5);
+  music = loadSound("audio/newmayphobia.mp3", 0.5);
+  music.loop(true);
 
   if(!('highscores' in localStorage)){
     localStorage['highscores'] = JSON.stringify({easy: 0, normal: 0, hard: 0});
@@ -378,21 +388,49 @@ function setupSettingsIcon(){
 }
 
 function setupSettingsMenu(){
-  sfxToggleBtnSize = 64;
+  // sfx toggle button
+  const sfxToggleBtnSize = 64;
   sfxToggleBtn = new Clickable();
   sfxToggleBtn.text = "";
-  sfxToggleBtn.locate(canvasWidth / 2 - sfxToggleBtnSize / 2, canvasHeight / 2 - sfxToggleBtnSize / 2);
+  sfxToggleBtn.image = sfxOnIcon;
+  sfxToggleBtn.locate(canvasWidth / 2 - sfxToggleBtnSize - 10, canvasHeight / 2 - sfxToggleBtnSize / 2);
   sfxToggleBtn.resize(sfxToggleBtnSize, sfxToggleBtnSize);
   sfxToggleBtn.onPress = () => {
     sfxOn = !sfxOn;
+    sfxToggleBtn.image = sfxOn ? sfxOnIcon : sfxOffIcon;
     if(sfxOn) menuClickSfx.play();
   }
   sfxToggleBtn.onHover = () => {
-    sfxToggleBtn.color = "#ffc";
+    sfxToggleBtn.color = btnHoverColor;
   }
   sfxToggleBtn.onOutside = () => {
-    sfxToggleBtn.color = "#fff";
+    sfxToggleBtn.color = btnDefaultColor;
   }
+
+  // music toggle button
+  musicToggleBtn = new Clickable();
+  musicToggleBtn.text = "";
+  musicToggleBtn.image = musicOnIcon;
+  musicToggleBtn.locate(canvasWidth / 2 + 10, canvasHeight / 2 - sfxToggleBtnSize / 2);
+  musicToggleBtn.resize(sfxToggleBtnSize, sfxToggleBtnSize);
+  musicToggleBtn.onPress = () => {
+    musicOn = !musicOn;
+    if(musicOn && !music.playing()){
+      music.play();
+    }
+    else{
+      music.pause();
+    }
+    musicToggleBtn.image = musicOn ? musicOnIcon : musicOffIcon;
+    if(sfxOn) menuClickSfx.play();
+  }
+  musicToggleBtn.onHover = () => {
+    musicToggleBtn.color = btnHoverColor;
+  }
+  musicToggleBtn.onOutside = () => {
+    musicToggleBtn.color = btnDefaultColor;
+  }
+
 
   // okay button
   okayButtonSize = 64;
@@ -410,10 +448,10 @@ function setupSettingsMenu(){
     }
   }
   okayButton.onHover = () => {
-    okayButton.color = "#ffc";
+    okayButton.color = btnHoverColor;
   }
   okayButton.onOutside = () => {
-    okayButton.color = "#fff";
+    okayButton.color = btnDefaultColor;
   }
 }
 
@@ -438,10 +476,10 @@ function setupStartScreen(){
     registerGame("easy", difficultyData);
   }
   easyBtn.onHover = () => {
-    easyBtn.color = "#ffc";
+    easyBtn.color = btnHoverColor;
   }
   easyBtn.onOutside = () => {
-    easyBtn.color = "#fff";
+    easyBtn.color = btnDefaultColor;
   }
   
   normBtn = new Clickable();
@@ -455,10 +493,10 @@ function setupStartScreen(){
     registerGame("normal", difficultyData);
   }
   normBtn.onHover = () => {
-    normBtn.color = "#ffc";
+    normBtn.color = btnHoverColor;
   }
   normBtn.onOutside = () => {
-    normBtn.color = "#fff";
+    normBtn.color = btnDefaultColor;
   }
   
   hardBtn = new Clickable();
@@ -472,10 +510,10 @@ function setupStartScreen(){
     registerGame("hard", difficultyData);
   }
   hardBtn.onHover = () => {
-    hardBtn.color = "#ffc";
+    hardBtn.color = btnHoverColor;
   }
   hardBtn.onOutside = () => {
-    hardBtn.color = "#fff";
+    hardBtn.color = btnDefaultColor;
   }
 
   leaderboardBtn = new Clickable();
@@ -489,10 +527,10 @@ function setupStartScreen(){
     fetchLeaderboard();
   }
   leaderboardBtn.onHover = () => {
-    leaderboardBtn.color = "#ffc";
+    leaderboardBtn.color = btnHoverColor;
   }
   leaderboardBtn.onOutside = () => {
-    leaderboardBtn.color = "#fff";
+    leaderboardBtn.color = btnDefaultColor;
   }
 
   helpBtn = new Clickable();
@@ -520,10 +558,10 @@ function setupStartScreen(){
     })
   }
   helpBtn.onHover = () => {
-    helpBtn.color = "#ffc";
+    helpBtn.color = btnHoverColor;
   }
   helpBtn.onOutside = () => {
-    helpBtn.color = "#fff";
+    helpBtn.color = btnDefaultColor;
   }
 }
 
@@ -539,10 +577,10 @@ function setupLeaderboard(){
     showingLeaderboard = false;
   }
   backBtn.onHover = () => {
-    backBtn.color = "#ffc";
+    backBtn.color = btnHoverColor;
   }
   backBtn.onOutside = () => {
-    backBtn.color = "#fff";
+    backBtn.color = btnDefaultColor;
   }
 
   const PAGE_BUTTON_WIDTH = 40;
@@ -555,10 +593,10 @@ function setupLeaderboard(){
     btn.textSize = 32;
     btn.textFont = globalFont;
     btn.onHover = () => {
-      btn.color = "#ffc";
+      btn.color = btnHoverColor;
     }
     btn.onOutside = () => {
-      btn.color = "#fff";
+      btn.color = btnDefaultColor;
     }
     btn.onPress = () => {
       if(leaderboardPage + increment < 1) return;
@@ -587,10 +625,10 @@ function setupGameOverScreen(){
     submitHighScore();
   }
   submitScoreBtn.onHover = () => {
-    submitScoreBtn.color = "#ffc";
+    submitScoreBtn.color = btnHoverColor;
   }
   submitScoreBtn.onOutside = () => {
-    submitScoreBtn.color = "#fff";
+    submitScoreBtn.color = btnDefaultColor;
   }
 
   submitScoreBtnDisabled = new Clickable();
@@ -625,10 +663,10 @@ function setupGameOverScreen(){
     // resetLevel();
   }
   restartBtn.onHover = () => {
-    restartBtn.color = "#ffc";
+    restartBtn.color = btnHoverColor;
   }
   restartBtn.onOutside = () => {
-    restartBtn.color = "#fff";
+    restartBtn.color = btnDefaultColor;
   }
 }
 
@@ -789,8 +827,7 @@ function drawSettingsMenu(){
   rect(0, 0, canvasWidth, canvasHeight);
 
   sfxToggleBtn.draw();
-  imageMode(CORNER);
-  image(sfxOn ? sfxOnIcon : sfxOffIcon, canvasWidth / 2 - sfxToggleBtnSize / 2, canvasHeight / 2 - sfxToggleBtnSize / 2, 64, 64);
+  musicToggleBtn.draw();
 
   okayButton.draw();
   pop();
@@ -1363,6 +1400,9 @@ function resetLevel(){
 }
 
 function registerGame(difficulty, data){
+  if(!music.playing() && musicOn)
+    music.play();
+
   fetch(`${serverURLBase}/context-collapse-token`)
     .then(res => {
       res.json().then(d => {
