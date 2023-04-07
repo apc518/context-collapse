@@ -76,6 +76,12 @@ let enemySpawnPeriodMax;
 let enemySpawnPeriod;
 let enemySpawnAcceleration; // enemySpawnPeriod gets multiplied by this on every spawn
 let enemyBossRate;
+
+let smallMonsterAcceleration;
+let smallMonsterMaxSpeed;
+let bigMonsterAcceleration;
+let bigMonsterMaxSpeed;
+
 const enemyBossHealthMax = 80;
 const enemyHealthMax = 20;
 
@@ -1238,13 +1244,13 @@ function attractMonsters(){
   if(!freezing){
     for(var i = 0; i < enemyGroup.length; i++){
       monster = enemyGroup[i];
-      monster.attractionPoint(1, player.position.x, player.position.y);
-      monster.maxSpeed = 3;
+      monster.attractionPoint(smallMonsterAcceleration, player.position.x, player.position.y);
+      monster.maxSpeed = smallMonsterMaxSpeed;
     }
     for(var i = 0; i < enemyBossGroup.length; i++){
       monster = enemyBossGroup[i];
-      monster.attractionPoint(0.15, player.position.x, player.position.y);
-      monster.maxSpeed = 2;
+      monster.attractionPoint(bigMonsterAcceleration, player.position.x, player.position.y);
+      monster.maxSpeed = bigMonsterMaxSpeed;
     }
   }
 }
@@ -1443,6 +1449,11 @@ function startGame(difficulty, data){
   enemySpawnAcceleration = settings["enemySpawnAcceleration"];
   enemySpawnPeriod = enemySpawnPeriodMax;
   enemyBossRate = settings["enemyBossRate"];
+
+  smallMonsterAcceleration = settings["smallMonsterAcceleration"];
+  smallMonsterMaxSpeed = settings["smallMonsterMaxSpeed"];
+  bigMonsterAcceleration = settings["bigMonsterAcceleration"];
+  bigMonsterMaxSpeed = settings["bigMonsterMaxSpeed"];
 
   gameIsStarting = false;
 
