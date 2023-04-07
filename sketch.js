@@ -1422,7 +1422,7 @@ function registerGame(difficulty, data){
       console.log("Playing offline: will not be able to submit highscores.");
       clickablesDisabled = true;
       Swal.fire({
-        title: "Playing in offline mode.\nYou will not be able to submit a high score.",
+        title: "Could not connect to leaderboard server.\nYou will not be able to submit a high score.",
         imageUrl: "images/wifi-off.png",
         imageWidth: 96,
         imageHeight: 96,
