@@ -8,6 +8,7 @@ TODO:
 
 // dev
 let debugSprites = false;
+let drawSafeRadius = false;
 
 // game state stuff
 const STARTING = 0;
@@ -84,6 +85,7 @@ let bigMonsterMaxSpeed;
 
 const enemyBossHealthMax = 80;
 const enemyHealthMax = 20;
+const safeRadius = 256; // monsters dont spawn immediately on or next to the player
 
 // chance that a boss DOESN'T spawn is multiplied by this every time a monster spawns
 // this will only activate after the enemySpawnPeriod has reached its minimum.
@@ -232,6 +234,7 @@ function setup(){
   killallAbilities = new Group();
   freezeAbilities = new Group();
   hotbarItems = new Group();
+  players = new Group();
   
   twangSfx = loadSound("audio/arrow_shot_1.wav", 0.2);
   hitSfx = loadSound("audio/hit_1.wav");
@@ -303,6 +306,19 @@ function setup(){
   }, 30 * 1000);
 }
 
+// custom _drawSprites to control the order
+function _drawSprites(){
+  arrowBunches.draw();
+  healthPacks.draw();
+  killallAbilities.draw();
+  freezeAbilities.draw();
+  arrows.draw();
+  enemyBossGroup.draw();
+  enemyGroup.draw();
+  hotbarItems.draw();
+  players.draw();
+}
+
 function draw(){
   background(backgroundImage);
   if(gameState === STARTING){
@@ -320,13 +336,14 @@ function draw(){
     playerControls();
     collisions();
     attractMonsters();
-    drawSprites();
+    _drawSprites();
     assignImages();
     drawPowerups();
     drawStats();
     noCursor();
     drawCursor();
     cleanup();
+    drawSafeFromSpawningArea();
     if(freezeTimer === 0) freezing = false;
     gameFrame++;
   }
@@ -334,7 +351,7 @@ function draw(){
     // pause monsters
     pauseMonsters();
     cursor(ARROW, mouseX, mouseY);
-    drawSprites();
+    _drawSprites();
     drawPowerups();
     drawStats();
     if(gameIsOver && showingSettings){
@@ -912,6 +929,17 @@ function drawLeaderboard(){
   pop();
 }
 
+function drawSafeFromSpawningArea(){
+  if (drawSafeRadius){
+    push();
+    stroke(255, 0, 0);
+    strokeWeight(1);
+    noFill();
+    ellipse(player.position.x, player.position.y, safeRadius * 2, safeRadius * 2);
+    pop();
+  }
+}
+
 function assignImages(){
   // normal enemies
   for(let i = 0; i < enemyGroup.length; i++){
@@ -1194,8 +1222,8 @@ function spawnArrowBunch(){
 function spawnMonster(){
   if(enemySpawnFrame <= gameFrame && !freezing){
     // create a random vector pointing out from the player, length half of the canvasWidth
-    var safeRadius = 256; // monsters dont spawn immediately on or next to the player
-    var length = Math.random() * canvasWidth / 2 + safeRadius; // hypotenuse
+    
+    var length = Math.random() * (canvasWidth / 2 - safeRadius) + safeRadius; // hypotenuse
     var theta = Math.random() * 2 * Math.PI;
 
     var x_ = Math.cos(theta) * length;
@@ -1269,12 +1297,12 @@ function pauseMonsters(){
 function collisions(){
   enemyGroup.overlap(arrows, damageEnemy);
   enemyBossGroup.overlap(arrows, damageEnemy);
-  enemyGroup.collide(player, damagePlayer);
-  enemyBossGroup.collide(player, damagePlayer);
-  arrowBunches.overlap(player, stockArrows);
-  healthPacks.overlap(player, healPlayer);
-  killallAbilities.overlap(player, equipKillall);
-  freezeAbilities.overlap(player, equipFreeze);
+  enemyGroup.collide(players, damagePlayer);
+  enemyBossGroup.collide(players, damagePlayer);
+  arrowBunches.overlap(players, stockArrows);
+  healthPacks.overlap(players, healPlayer);
+  killallAbilities.overlap(players, equipKillall);
+  freezeAbilities.overlap(players, equipFreeze);
 }
 
 function damageEnemy(enemy, arrow){
@@ -1440,6 +1468,7 @@ function startGame(difficulty, data){
   player.setCollider("rectangle", 0, 0, playerWidth, playerHeight);
   player.debug = debugSprites;
   player.depth = 2;
+  players.add(player);
 
   var settings = data[difficulty];
   difficultyString = settings["name"];
@@ -1485,6 +1514,7 @@ function mousePressed(){
       var arrow = createSprite(player.position.x, player.position.y);
       arrow.addImage(arrowImage);
       arrow.scale = 0.35;
+      console.log(arrow);
       
       // calculate rotation, default points NE
       var x_diff = mouseX - player.position.x;
@@ -1500,6 +1530,7 @@ function mousePressed(){
       arrow.debug = debugSprites;
       arrow.setCollider("rectangle", 0, 0, 20, 20);
       arrows.add(arrow);
+      console.log(arrows);
       playerArrows--;
       if(sfxOn) twangSfx.play();
     }
