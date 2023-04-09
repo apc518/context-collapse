@@ -1,10 +1,8 @@
 /*
-
 CONTEXT COLLAPSE by Andy Chamberlain
-
-TODO:
-  - explosion animations?
 */
+
+VERSION = "1.0.0";
 
 // dev
 let debugSprites = false;
@@ -15,27 +13,39 @@ const STARTING = 0;
 const PLAYING = 1;
 const PAUSED = 2;
 
-const gameStateFuncs = {
-  0: () => frameRate(SLOW_FRAMERATE),
-  1: () => { pauseScreen = false; frameRate(FRAMERATE); },
-  2: () => frameRate(SLOW_FRAMERATE)
-};
-
 const FRAMERATE = 60;
-const SLOW_FRAMERATE = 20;
 
 // canvas
-const canvasHeight = 800;
+const canvasHeight = 900;
 const canvasWidth = canvasHeight;
 let p5canvas;
 
 const globalFont = "Trebuchet MS";
 
+// rng
+let gameSeed;
+let rng; // a function produced by mulberry32()
+
+// recording
+/**
+{
+  gameVersion: string,
+  startingTime: number,   // (unix ms)
+  seed: number,
+  inputs[]: {    // indexed by gameFrame 
+    keysPressed: [], 
+    isMousePressed: boolean, 
+    mousePosition: { x: number, y: number }
+  }
+}
+*/
+const replay = {};
+
 // player stuff
 const playerWidth = 64;
 const playerHeight = 64;
 
-const playerMoveForce = 0.8;
+const playerMoveForce = 0.9;
 const playerFriction = 0.1;
 const playerStrength = 20;
 
@@ -52,44 +62,46 @@ const healthBarWidth = 200;
 // arrow item constants
 const arrowBunchSize = 8;
 const arrowSpawnPeriodDefault = 4;
-const arrowSpawnPeriodAfterBossRateMultiplier = 3;
+const arrowSpawnPeriodAfterBigEnemyRateMultiplier = 3;
 
-// killall powerup constants
-const killallEmbargo = 120 * FRAMERATE; // frames before we start spawning killall powerups
-const killallSpawnPeriodAvg = 80 * FRAMERATE;
-const killallSpawnVariance = 20 * FRAMERATE;
-
-// freeze powerup constants
-const freezeSpawnPeriodAvg = 50 * FRAMERATE;
-const freezeSpawnVariance = 10 * FRAMERATE;
+// powerup constants
+const killallSpawnPeriod = 80 * FRAMERATE;
+const freezeSpawnPeriod = 50 * FRAMERATE;
 
 const allSounds = [];
 
-let difficultyData;
 let difficultyString;
 let difficultyColor;
+let currentDifficulty;
 
 let enemyGroup;
-let enemyBossGroup;
+let bigEnemyGroup;
+let bossGroup;
 
 let enemySpawnPeriodMin;
 let enemySpawnPeriodMax;
 let enemySpawnPeriod;
 let enemySpawnAcceleration; // enemySpawnPeriod gets multiplied by this on every spawn
-let enemyBossRate;
+let bigEnemyRate;
 
 let smallMonsterAcceleration;
 let smallMonsterMaxSpeed;
 let bigMonsterAcceleration;
 let bigMonsterMaxSpeed;
 
-const enemyBossHealthMax = 80;
-const enemyHealthMax = 20;
-const safeRadius = 256; // monsters dont spawn immediately on or next to the player
+let bossHealthMax;
+const bossValue = 50;
+const bossSpawnScoreInterval = 150;
+let bossSpawnScore = 100;
+const sockSpeed = 7;
 
-// chance that a boss DOESN'T spawn is multiplied by this every time a monster spawns
+const bigEnemyHealthMax = 80;
+const enemyHealthMax = 20;
+const safeRadius = 320; // monsters dont spawn immediately on or next to the player
+
+// chance that a bigEnemy DOESN'T spawn is multiplied by this every time a monster spawns
 // this will only activate after the enemySpawnPeriod has reached its minimum.
-const enemyBossRateMultiplier = 0.998;
+const bigEnemyRateMultiplier = 0.998;
 
 const serverURLBase = "https://chambercode-back.herokuapp.com";
 // const serverURLBase = "http://localhost:5000";
@@ -102,20 +114,21 @@ let authToken;
 let sweetAlerting = false;
 
 let sfxOn = true;
-let musicOn = true;
+let musicOn = false;
 let useLegacySfx = false;
 
 // button constants
-const btnHoverColor = "#ffc";
+const btnHoverColor = "#ff9";
 const btnDefaultColor = "#fff";
 
 
 class MetaObj{
-  constructor(health=0, strength=10, value=1, boss=false){
+  constructor(health=0, strength=10, value=1, bigEnemy=false, isBoss=false){
     this.health = health;
     this.strength = strength;
     this.value = value;
-    this.isBoss = boss;
+    this.isBigEnemy = bigEnemy;
+    this.isBoss = isBoss;
   }
 }
 
@@ -149,18 +162,16 @@ function initAgnosticGlobalVars(){
   arrowBunchSpawnFrame = 0;
   playerArrows = arrowBunchSize;
   
-  killallEquipped = false;
-  killallAbilitySpawnPeriod = killallSpawnPeriodAvg;
+  killallEquipped = true;
   killallAbilityPrevSpawn = 0; // seconds that a killall ability is available for before it disappears
 
-  freezeEquipped = false;
+  freezeEquipped = true;
   freezing = false; // whether or not it is currently active.
   freezeTimer = 0;
   freezePrevSpawn = 0;
-  freezeSpawnPeriod = freezeSpawnPeriodAvg;
 
   enemySpawnFrame = 0;
-  enemyBossRateMultiplierIsActive = false;
+  bigEnemyRateMultiplierIsActive = false;
 
   leaderboard = null;
 }
@@ -184,21 +195,27 @@ function preload(){
   sfxOffIcon = loadImage("images/volume_off.png");
   musicOnIcon = loadImage("images/music_on.png");
   musicOffIcon = loadImage("images/music_off.png");
+  bossManImage = loadImage("images/bossman.png");
+  sockImage = loadImage("images/sock.png");
+  blankImage = loadImage("images/nothing.png");
+  multiShot = loadImage("images/mc_three_arrows.png");
+  titleImage = loadImage("images/cc-title-2.png");
 
-  bossDamageImages = [];
-  for(let i = 4; i >= 0; i--) bossDamageImages.push(loadImage("images/enemy-boss-" + i + ".png"));
+  bigEnemyDamageImages = [];
+  for(let i = 4; i >= 0; i--) bigEnemyDamageImages.push(loadImage("images/enemy-big-" + i + ".png"));
 
   monsterFreezeImages = [];
   for(let i = 0; i < 5; i++) monsterFreezeImages.push(loadImage("images/enemy-1-freeze" + i + ".png"));
 
-  bossFreezeImages = [];
-  for(let i = 0; i < 5; i++) bossFreezeImages.push(loadImage("images/enemy-boss-freeze" + i + ".png"));
+  bigEnemyFreezeImages = [];
+  for(let i = 0; i < 5; i++) bigEnemyFreezeImages.push(loadImage("images/enemy-big-freeze" + i + ".png"));
 }
 
-function loadSound(path, vol=1){
+function loadSound(path, vol=1, rate=1){
   return new Howl({
     src: [path],
-    volume: vol
+    volume: vol,
+    rate: rate
   });
 }
 
@@ -227,7 +244,7 @@ function setup(){
   initAgnosticGlobalVars();
 
   enemyGroup = new Group();
-  enemyBossGroup = new Group();
+  bigEnemyGroup = new Group();
   arrows = new Group();
   arrowBunches = new Group();
   healthPacks = new Group();
@@ -235,6 +252,8 @@ function setup(){
   freezeAbilities = new Group();
   hotbarItems = new Group();
   players = new Group();
+  bossGroup = new Group();
+  sockGroup = new Group();
   
   twangSfx = loadSound("audio/arrow_shot_1.wav", 0.2);
   hitSfx = loadSound("audio/hit_1.wav");
@@ -249,18 +268,13 @@ function setup(){
   playerDeathSfx = loadSound("audio/death_2.wav");
   healthPackSfx = loadSound("audio/health_bottle_3.wav");
   menuClickSfx = loadSound("audio/collider-boom-clave.wav", 0.5);
+  sockSfx = loadSound("audio/sock_1.wav", 0.5, 5);
   music = loadSound("audio/newmayphobia.mp3", 0.5);
   music.loop(true);
 
   if(!('highscores' in localStorage)){
     localStorage['highscores'] = JSON.stringify({easy: 0, normal: 0, hard: 0});
   }
-
-  $.getJSON("./difficulty.json", function(data){
-    difficultyData = data;
-  }).fail(function (){
-    console.log("Error loading difficulty settings.");
-  });
 
   noCursor();
 
@@ -289,21 +303,6 @@ function setup(){
   }
   document.addEventListener(visibilityChange, pause);
   window.addEventListener("blur", pause);
-
-  // check in with the server every 30 seconds to keep our game token alive
-  checkinInterval = setInterval(() => {
-    if(authToken){
-      fetch(`${serverURLBase}/context-collapse-checkin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          token: authToken
-        })
-      }).catch(e => console.error(e));
-    }
-  }, 30 * 1000);
 }
 
 // custom _drawSprites to control the order
@@ -313,10 +312,14 @@ function _drawSprites(){
   killallAbilities.draw();
   freezeAbilities.draw();
   arrows.draw();
-  enemyBossGroup.draw();
+  bossGroup.draw();
+  bigEnemyGroup.draw();
   enemyGroup.draw();
   hotbarItems.draw();
+  sockGroup.draw();
   players.draw();
+
+  drawBossHealthBars();
 }
 
 function draw(){
@@ -336,6 +339,8 @@ function draw(){
     playerControls();
     collisions();
     attractMonsters();
+    attractProjectiles();
+    shootSocks();
     _drawSprites();
     assignImages();
     drawPowerups();
@@ -348,8 +353,8 @@ function draw(){
     gameFrame++;
   }
   else if(gameState === PAUSED){ // includes game over
-    // pause monsters
     pauseMonsters();
+    pauseProjectiles();
     cursor(ARROW, mouseX, mouseY);
     _drawSprites();
     drawPowerups();
@@ -433,7 +438,7 @@ function setupSettingsMenu(){
   // music toggle button
   musicToggleBtn = new Clickable();
   musicToggleBtn.text = "";
-  musicToggleBtn.image = musicOnIcon;
+  musicToggleBtn.image = musicOn ? musicOnIcon : musicOffIcon;
   musicToggleBtn.locate(canvasWidth / 2 + 10, canvasHeight / 2 - sfxToggleBtnSize / 2);
   musicToggleBtn.resize(sfxToggleBtnSize, sfxToggleBtnSize);
   musicToggleBtn.onPress = () => {
@@ -486,7 +491,7 @@ function setupFreezeTimer(){
 }
 
 function setupStartScreen(){
-  frameRate(SLOW_FRAMERATE);
+  frameRate(FRAMERATE);
 
   easyBtn = new Clickable();
   easyBtn.locate(canvasWidth / 2 - 150, canvasHeight / 2);
@@ -496,7 +501,7 @@ function setupStartScreen(){
   easyBtn.textFont = globalFont;
   easyBtn.onPress = () => {
     if(sfxOn) menuClickSfx.play();
-    registerGame("easy", difficultyData);
+    registerGame("easy", difficultySettings);
   }
   easyBtn.onHover = () => {
     easyBtn.color = btnHoverColor;
@@ -513,7 +518,7 @@ function setupStartScreen(){
   normBtn.textFont = globalFont;
   normBtn.onPress = () => {
     if(sfxOn) menuClickSfx.play();
-    registerGame("normal", difficultyData);
+    registerGame("normal", difficultySettings);
   }
   normBtn.onHover = () => {
     normBtn.color = btnHoverColor;
@@ -530,7 +535,7 @@ function setupStartScreen(){
   hardBtn.textFont = globalFont;
   hardBtn.onPress = () => {
     if(sfxOn) menuClickSfx.play();
-    registerGame("hard", difficultyData);
+    registerGame("hard", difficultySettings);
   }
   hardBtn.onHover = () => {
     hardBtn.color = btnHoverColor;
@@ -696,12 +701,28 @@ function setupGameOverScreen(){
 
 /// DRAWING FUNCTIONS
 function drawStartScreen(){
-  textSize(72);
-  fill("#ffff88");
-  textAlign(CENTER);
-  textFont(globalFont);
-  text("CONTEXT COLLAPSE", canvasWidth / 2, canvasHeight / 2 - 140);
+  push();
 
+  const titleY = canvasHeight / 3.5;
+  imageMode(CENTER);
+  image(titleImage, canvasWidth / 2, titleY);
+
+  const abilityIconRotation = (frameCount / 30) % (2*PI);
+  const abilityIconScale = 0.6;
+
+  push();
+  translate(canvasWidth / 2 - 296, titleY);
+  rotate(abilityIconRotation);
+  image(freezeAbilityImage, 0, 0, freezeAbilityImage.width * abilityIconScale, freezeAbilityImage.height * abilityIconScale);
+  pop();
+  
+  push();
+  translate(canvasWidth / 2 + 55, titleY);
+  rotate(abilityIconRotation + PI/4);
+  image(killallAbilityImage, 0, 0, killallAbilityImage.width * abilityIconScale, killallAbilityImage.height * abilityIconScale);
+  pop();
+
+  textAlign(CENTER);
   textSize(32);
   fill("#aaa");
   text("Select difficulty", canvasWidth / 2, canvasHeight / 2 - 30);
@@ -712,6 +733,8 @@ function drawStartScreen(){
   hardBtn.draw();
   leaderboardBtn.draw();
   helpBtn.draw();
+
+  pop();
 }
 
 function drawPowerups(){
@@ -900,11 +923,11 @@ function drawLeaderboard(){
 
     const alignBias = canvasWidth / 6 - 10;
     
-    fill(difficultyData.easy.color);
+    fill(difficultySettings.easy.color);
     text(easyLeaderboardString, canvasWidth / 6 - alignBias, 80);
-    fill(difficultyData.normal.color);
+    fill(difficultySettings.normal.color);
     text(normalLeaderboardString, canvasWidth / 2 - alignBias, 80);
-    fill(difficultyData.hard.color);
+    fill(difficultySettings.hard.color);
     text(hardLeaderboardString, canvasWidth - canvasWidth / 6 - alignBias, 80);
   }
   catch(e){
@@ -940,6 +963,25 @@ function drawSafeFromSpawningArea(){
   }
 }
 
+function drawBossHealthBars(){
+  const bossHbOffsetX = -148;
+  const bossHbOffsetY = -150;
+  const bossHbWidth = 300;
+  const bossHbHeight = 20;
+
+  for (const boss of bossGroup){
+    push();
+    strokeWeight(2);
+    stroke(0);
+    noFill();
+    rect(boss.position.x + bossHbOffsetX, boss.position.y + bossHbOffsetY, bossHbWidth, bossHbHeight);
+    noStroke();
+    fill(255, 0, 0, 80);
+    rect(boss.position.x + bossHbOffsetX, boss.position.y + bossHbOffsetY, bossHbWidth * boss.tag.health / currentDifficulty.bossHealthMax, bossHbHeight);
+    pop();
+  }
+}
+
 function assignImages(){
   // normal enemies
   for(let i = 0; i < enemyGroup.length; i++){
@@ -952,16 +994,16 @@ function assignImages(){
       freezing = false;
     }
   }
-  // boss enemies
-  for(let i = 0; i < enemyBossGroup.length; i++){
-    let enemy = enemyBossGroup[i];
+  // bigEnemy enemies
+  for(let i = 0; i < bigEnemyGroup.length; i++){
+    let enemy = bigEnemyGroup[i];
     if(freezeTimer >= 1){
-      enemy.addImage(bossFreezeImages[5 - freezeTimer]);
+      enemy.addImage(bigEnemyFreezeImages[5 - freezeTimer]);
     }
     else{
       freezing = false;
-      // console.log(`index: ${Math.floor(4 * enemy.tag.health / enemyBossHealthMax)}`);
-      enemy.addImage(bossDamageImages[Math.floor(4 * enemy.tag.health / enemyBossHealthMax)]);
+      // console.log(`index: ${Math.floor(4 * enemy.tag.health / bigEnemyHealthMax)}`);
+      enemy.addImage(bigEnemyDamageImages[Math.floor(4 * enemy.tag.health / bigEnemyHealthMax)]);
     }
   }
 }
@@ -1092,8 +1134,6 @@ function submitHighScore(){
           name: localStorage.name,
           score: score,
           difficulty: difficultyString.toLowerCase(),
-          token: authToken,
-          scoreToken: scoreToken
         })
       })
       .then(res => {
@@ -1159,11 +1199,21 @@ function getHighScore(){
   return highscores[difficultyString.toLowerCase()];
 }
 
+// src: https://github.com/cprosche/mulberry32
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+
 
 /// SPAWNING
 function spawnKillallAbility(){
-  if(killallAbilityPrevSpawn + killallAbilitySpawnPeriod <= gameFrame && killallEmbargo < gameFrame){
-    var killallAbility = createSprite(Math.random() * canvasWidth, Math.random() * canvasHeight);
+  if(killallAbilityPrevSpawn + killallSpawnPeriod <= gameFrame){
+    var killallAbility = createSprite(rng() * canvasWidth, rng() * canvasHeight);
     killallAbility.addImage(killallAbilityImage);
     killallAbility.setCollider("rectangle", 0, 0, 96, 96);
     killallAbility.debug = debugSprites;
@@ -1171,14 +1221,12 @@ function spawnKillallAbility(){
     killallAbilities.add(killallAbility);
 
     killallAbilityPrevSpawn = gameFrame;
-    killallAbilitySpawnPeriod = killallSpawnPeriodAvg + Math.random() * 2 * killallSpawnVariance - killallSpawnVariance
   }
 }
 
 function spawnFreezeAbility(){
-  // console.log(`freezePrevSpawn: ${freezePrevSpawn}, freezeSpawnPeriod: ${freezeSpawnPeriod}, gameFrame: ${gameFrame}`)
   if(freezePrevSpawn + freezeSpawnPeriod <= gameFrame){
-    var freeze = createSprite(Math.random() * canvasWidth, Math.random() * canvasHeight);
+    var freeze = createSprite(rng() * canvasWidth, rng() * canvasHeight);
     freeze.addImage(freezeAbilityImage);
     freeze.setCollider("rectangle", 0, 0, 96, 96);
     freeze.debug = debugSprites;
@@ -1186,13 +1234,12 @@ function spawnFreezeAbility(){
     freezeAbilities.add(freeze);
 
     freezePrevSpawn = gameFrame;
-    freezeSpawnPeriod = freezeSpawnPeriodAvg + Math.random() * 2 * freezeSpawnVariance - freezeSpawnVariance;
   }
 }
 
 function spawnHealthPack(){
   if(healthPackPrevSpawn + healthPackSpawnPeriod <= gameFrame && healthPackEmbargo <= gameFrame){
-    var healthPack = createSprite(Math.random() * canvasWidth, Math.random() * canvasHeight);
+    var healthPack = createSprite(rng() * canvasWidth, rng() * canvasHeight);
     healthPack.addImage(healthPackImage);
     healthPack.setCollider("rectangle", 0, 0, 128, 128);
     healthPack.debug = debugSprites;
@@ -1200,14 +1247,14 @@ function spawnHealthPack(){
     healthPacks.add(healthPack);
 
     healthPackPrevSpawn = gameFrame;
-    healthPackSpawnPeriod = healthPackSpawnPeriodAverage + Math.random() * 2 * healthPackSpawnVariance + healthPackSpawnVariance;
+    healthPackSpawnPeriod = healthPackSpawnPeriodAverage + rng() * 2 * healthPackSpawnVariance + healthPackSpawnVariance;
   }
 }
 
 function spawnArrowBunch(){
   if(gameFrame === arrowBunchSpawnFrame){
     if(arrowBunches.length < 6){
-      var arrowBunch = createSprite(Math.random() * canvasWidth, Math.random() * canvasHeight);
+      var arrowBunch = createSprite(rng() * canvasWidth, rng() * canvasHeight);
       arrowBunch.addImage(arrowBunchImage);
       arrowBunch.setCollider("rectangle", 0, 0, 64, 64);
       arrowBunch.debug = debugSprites;
@@ -1223,51 +1270,73 @@ function spawnMonster(){
   if(enemySpawnFrame <= gameFrame && !freezing){
     // create a random vector pointing out from the player, length half of the canvasWidth
     
-    var length = Math.random() * (canvasWidth / 2 - safeRadius) + safeRadius; // hypotenuse
-    var theta = Math.random() * 2 * Math.PI;
+    var length = rng() * (canvasWidth / 2 - safeRadius) + safeRadius; // hypotenuse
+    var theta = rng() * 2 * Math.PI;
 
     var x_ = Math.cos(theta) * length;
     var y_ = Math.sin(theta) * length;
     
     var coords = wrangleCoords(player.position.x + x_, player.position.y + y_);
 
-    createMonster(coords[0], coords[1]);
+    createMonster(...coords);
     
     enemySpawnPeriod = max(enemySpawnPeriodMin, enemySpawnPeriod * enemySpawnAcceleration);
 
-    if(enemySpawnPeriod === enemySpawnPeriodMin){
-      enemyBossRateMultiplierIsActive = true;
-      arrowSpawnPeriod = arrowSpawnPeriodAfterBossRateMultiplier;
+    if(enemySpawnPeriod <= enemySpawnPeriodMin){
+      bigEnemyRateMultiplierIsActive = true;
+      arrowSpawnPeriod = arrowSpawnPeriodAfterBigEnemyRateMultiplier;
     }
 
-    if(enemyBossRateMultiplierIsActive){
-      enemyBossRate = 1 - (enemyBossRateMultiplier * (1 - enemyBossRate));
+    if(bigEnemyRateMultiplierIsActive){
+      bigEnemyRate = 1 - (bigEnemyRateMultiplier * (1 - bigEnemyRate));
     }
 
     enemySpawnFrame = gameFrame + FRAMERATE * enemySpawnPeriod;
   }
 }
 
+let bossCount = 0;
+
 function createMonster(x, y){
   var monster = createSprite(x, y);
   monster.debug = debugSprites;
-  if(Math.random() > enemyBossRate){
+  if (score >= bossSpawnScore && !bossIsAlive()){
+    // spawn the boss as far away from the player as possible, aka the far corner
+    monster.position.x = player.position.x > canvasWidth / 2 ? -150 : canvasWidth + 150;
+    monster.position.y = player.position.y > canvasHeight / 2 ? -150 : canvasHeight + 150;
+
+    monster.addImage(bossManImage);
+    monster.setCollider("circle", 0, 0, 135);
+    monster.tag = new MetaObj(health=bossHealthMax, strength=200, value=bossValue);
+    monster.tag.isBoss = true;
+    bossGroup.add(monster);
+    monster.scale = 1.4;
+    bossSpawnScore += bossSpawnScoreInterval;
+    bossCount += 1;
+  }
+  else if(rng() > bigEnemyRate && (bossCount > 1 || !bossIsAlive())){
+    // normal monster
     monster.addImage(enemyImage);
     monster.setCollider("rectangle", 0, 0, 42, 54);
     monster.tag = new MetaObj(health=enemyHealthMax, strength=10);
     enemyGroup.add(monster);
   }
-  else{
-    monster.addImage(bossDamageImages[0]);
+  else if (bossCount > 2 || !bossIsAlive()){
+    // big monster
+    monster.addImage(bigEnemyDamageImages[0]);
     monster.scale = 0.5;
-    monster.setCollider("rectangle", 0, 0, 180, 200);
-    monster.tag = new MetaObj(health=enemyBossHealthMax, strength=40, value=3, boss=true);
-    enemyBossGroup.add(monster);
+    monster.setCollider("circle", 0, -3, 110);
+    monster.tag = new MetaObj(health=bigEnemyHealthMax, strength=30, value=3, bigEnemy=true);
+    bigEnemyGroup.add(monster);
   }
 }
 
+function bossIsAlive() {
+  return bossGroup.length > 0;
+}
 
-/// MONSTER MOVEMENT
+
+/// NON-PLAYER MOVEMENT
 function attractMonsters(){
   if(!freezing){
     for(var i = 0; i < enemyGroup.length; i++){
@@ -1275,11 +1344,83 @@ function attractMonsters(){
       monster.attractionPoint(smallMonsterAcceleration, player.position.x, player.position.y);
       monster.maxSpeed = smallMonsterMaxSpeed;
     }
-    for(var i = 0; i < enemyBossGroup.length; i++){
-      monster = enemyBossGroup[i];
+    for(var i = 0; i < bigEnemyGroup.length; i++){
+      monster = bigEnemyGroup[i];
       monster.attractionPoint(bigMonsterAcceleration, player.position.x, player.position.y);
       monster.maxSpeed = bigMonsterMaxSpeed;
     }
+    for(let i = 0; i < bossGroup.length; i++){
+      monster = bossGroup[i];
+      monster.attractionPoint(0.01, player.position.x, player.position.y);
+      monster.maxSpeed = 0.5;
+    }
+  }
+}
+
+function attractProjectiles(){
+  for (const projectileList of [arrows, sockGroup]){
+    for (const projectile of projectileList){
+      let dx = cos(projectile.tag.direction);
+      let dy = sin(projectile.tag.direction);
+      
+      projectile.maxSpeed = projectile.tag.maxSpeed;
+
+      projectile.attractionPoint(projectile.maxSpeed, projectile.position.x + dx, projectile.position.y + dy);
+    }
+  }
+}
+
+
+let sockShootingFrame = 0;
+let sockHitbox = [3, 17, 75, 30];
+let otherSockHitbox = [20, -18, 30, 45];
+
+function shootSocks() {
+  if (!bossIsAlive() || freezing) return;
+
+  const sockShootingPeriod = 45; // frames
+  const sockDamage = 5;
+  const sockTargetSpread = PI / 3;
+  
+  if (gameFrame >= sockShootingFrame){
+    if (sfxOn) sockSfx.play();
+    const bossPos = [bossGroup[0].position.x, bossGroup[0].position.y];
+    const theta = atan((player.position.y - bossPos[1]) / (player.position.x - bossPos[0])) + rng() * sockTargetSpread - (sockTargetSpread / 2) + (player.position.x < bossPos[0] ? PI : 0);
+    const sockTarget = [bossPos[0] + cos(theta), bossPos[1] + sin(theta)];
+
+    let sock = createSprite(...bossPos);
+    sock.addImage(sockImage);
+    
+    sock.attractionPoint(sockSpeed, ...sockTarget);
+    sock.debug = debugSprites;
+    sock.setCollider("rectangle", ...sockHitbox);
+    sockGroup.add(sock);
+
+    sock.tag.otherSock = createSprite(sock.position.x, sock.position.y);
+    sock.tag.otherSock.attractionPoint(sockSpeed, ...sockTarget);
+    sock.tag.otherSock.debug = debugSprites;
+    sock.tag.otherSock.setCollider("rectangle", ...otherSockHitbox);
+    sock.tag.otherSock.addImage(blankImage);
+    sockGroup.add(sock.tag.otherSock);
+
+    sock.tag.otherSock.tag.otherSock = sock;
+
+    sock.tag.strength = sockDamage;
+    sock.tag.otherSock.tag.strength = sockDamage;
+    
+    sock.scale = 0.75;
+    sock.tag.otherSock.scale = 0.75;
+
+    sock.maxSpeed = sockSpeed;
+    sock.tag.otherSock.maxSpeed = sockSpeed;
+
+    sock.tag.direction = theta;
+    sock.tag.otherSock.tag.direction = theta;
+
+    sock.tag.maxSpeed = sockSpeed;
+    sock.tag.otherSock.tag.maxSpeed = sockSpeed;
+
+    sockShootingFrame = gameFrame + sockShootingPeriod;
   }
 }
 
@@ -1287,18 +1428,31 @@ function pauseMonsters(){
   for(var i = 0; i < enemyGroup.length; i++){
     enemyGroup[i].maxSpeed = 0;
   }
-  for(var i = 0; i < enemyBossGroup.length; i++){
-    enemyBossGroup[i].maxSpeed = 0;
+  for(var i = 0; i < bigEnemyGroup.length; i++){
+    bigEnemyGroup[i].maxSpeed = 0;
+  }
+  for(var i = 0; i < bossGroup.length; i++){
+    bossGroup[i].maxSpeed = 0;
   }
 }
 
+function pauseProjectiles(){
+  for (const projectileList of [arrows, sockGroup]){
+    for (const projectile of projectileList){
+      projectile.maxSpeed = 0;
+    }
+  }
+}
 
 /// COLLISIONS AND COLLISION HANDLERS
 function collisions(){
   enemyGroup.overlap(arrows, damageEnemy);
-  enemyBossGroup.overlap(arrows, damageEnemy);
+  bigEnemyGroup.overlap(arrows, damageEnemy);
+  bossGroup.overlap(arrows, damageEnemy);
   enemyGroup.collide(players, damagePlayer);
-  enemyBossGroup.collide(players, damagePlayer);
+  bigEnemyGroup.collide(players, damagePlayer);
+  bossGroup.collide(players, damagePlayer);
+  sockGroup.collide(players, damagePlayer);
   arrowBunches.overlap(players, stockArrows);
   healthPacks.overlap(players, healPlayer);
   killallAbilities.overlap(players, equipKillall);
@@ -1310,17 +1464,19 @@ function damageEnemy(enemy, arrow){
   enemy.tag.health = max(0, enemy.tag.health - (playerStrength * (freezing ? 0.8 : 1)));
   if(enemy.tag.health <= 0){
     enemy.remove();
+    
     if(!gameIsOver) score += enemy.tag.value;
     if(sfxOn) {
       if(freezing) iceBreakSfx.play();
       else monsterDeathSfx.play();
-      
     }
     ret = 0;
   }
-  else if(enemy.tag.isBoss){
-    var idx = Math.floor(4 * enemy.tag.health / enemyBossHealthMax);
-    enemy.addImage(bossDamageImages[idx]);
+  else if(enemy.tag.isBigEnemy){
+    var idx = Math.floor(4 * enemy.tag.health / bigEnemyHealthMax);
+    enemy.addImage(bigEnemyDamageImages[idx]);
+    enemy.velocity.x = 0;
+    enemy.velocity.y = 0;
   }
 
   if(arrow !== null){
@@ -1337,11 +1493,24 @@ function damageEnemy(enemy, arrow){
 
 function damagePlayer(enemy){
   if(sfxOn) playerDamageSfx.play();
-  enemy.remove();
-  playerHealth -= enemy.tag.strength + (Math.round(Math.random() * 6) - 3);
+  
+  playerHealth -= enemy.tag.strength;
+
+  if (enemy.tag.otherSock){
+    enemy.tag.otherSock.remove();
+  }
+  else{
+    console.log(enemy.velocity.x, enemy.tag.health)
+    playerSpeedX += enemy.velocity.x * enemy.tag.health / 40;
+    playerSpeedY += enemy.velocity.y * enemy.tag.health / 40;
+  }
+
   if(playerHealth <= 0){
     playerHealth = 0;
     gameOver();
+  }
+  else{
+    enemy.remove();
   }
 }
 
@@ -1373,21 +1542,31 @@ function equipFreeze(freeze){
 function doKillall(){
   if(killallEquipped){
     if(sfxOn) killallSfx.play();
-    score += Math.floor((enemyGroup.length) / 2);
+
+    scoreBeforeKillall = score;
+
     while(enemyGroup.length > 0) enemyGroup[0].remove();
 
-    let bossGroupCopy = [];
-    for(let eb of enemyBossGroup){
-      bossGroupCopy.push(eb);
-    }
-    for(let boss of bossGroupCopy) {
-      for(var k = 0; k < Math.floor(enemyBossHealthMax / playerStrength) - 1; k++){
-        if(damageEnemy(boss, null) != null) break;
+    // make copies of the enemy groups so we arent iterating
+    // through a mutating list; they will be removed from the
+    // original group if they are killed by damageEnemy, but
+    // they wont be removed from the copy
+    for (const enemyList of [enemyGroup.slice(), bigEnemyGroup.slice()]){
+      for (const enemy of enemyList){
+        for (let i = 0; i < 3; i++){
+          if (damageEnemy(enemy, null) != null) break;
+        }
       }
     }
     
-    score -= Math.floor((bossGroupCopy.length - enemyBossGroup.length) * 1.5); // subtract half the points gained from the big monsters
+    for (const enemy of bossGroup.slice()){
+      for (let i = 0; i < 18; i++){
+        if (enemy.tag.isBoss && enemy.tag.health <= playerStrength) break;
+        if (damageEnemy(enemy, null) != null) break;
+      }
+    }
 
+    score = scoreBeforeKillall;
     killallEquipped = false;
   }
 }
@@ -1433,36 +1612,29 @@ function resetLevel(){
   while(allSprites.length > 0) allSprites[0].remove();
 }
 
-function registerGame(difficulty, data){
+function registerGame(difficulty){
   if(!music.playing() && musicOn)
     music.play();
+  
+  startGame(difficulty, Math.floor(Math.random() * 1_000_000_000));
 
-  fetch(`${serverURLBase}/context-collapse-token`)
+  fetch(`${serverURLBase}/leaderboard`)
     .then(res => {
-      res.json().then(d => {
+      res.json().then(() => {
         networkError = false;
-        authToken = d["token"];
-        startGame(difficulty, data);
+      }).catch(() => {
+        networkError = false;
       });
     })
     .catch(e => {
       networkError = true;
-      console.log("Playing offline: will not be able to submit highscores.");
-      clickablesDisabled = true;
-      Swal.fire({
-        title: "Could not connect to leaderboard server.\nYou will not be able to submit a high score.",
-        imageUrl: "images/wifi-off.png",
-        imageWidth: 96,
-        imageHeight: 96,
-        backdrop: false,
-      }).then(() => {
-        clickablesDisabled = false;
-        startGame(difficulty, data)
-      })
     });
 }
 
-function startGame(difficulty, data){
+function startGame(difficulty, seed){
+  gameSeed = seed;
+  rng = mulberry32(gameSeed);
+
   player = createSprite(canvasWidth / 2, canvasHeight / 2, playerWidth, playerHeight); 
   player.addImage(playerImage);
   player.setCollider("rectangle", 0, 0, playerWidth, playerHeight);
@@ -1470,19 +1642,22 @@ function startGame(difficulty, data){
   player.depth = 2;
   players.add(player);
 
-  var settings = data[difficulty];
-  difficultyString = settings["name"];
-  difficultyColor = settings["color"];
-  enemySpawnPeriodMax = settings["enemySpawnPeriodMax"];
-  enemySpawnPeriodMin = settings["enemySpawnPeriodMin"];
-  enemySpawnAcceleration = settings["enemySpawnAcceleration"];
+  currentDifficulty = difficultySettings[difficulty];
+  difficultyString = currentDifficulty.name;
+  difficultyColor = currentDifficulty.color;
+  enemySpawnPeriodMax = currentDifficulty.enemySpawnPeriodMax;
+  enemySpawnPeriodMin = currentDifficulty.enemySpawnPeriodMin;
+  enemySpawnAcceleration = currentDifficulty.enemySpawnAcceleration;
   enemySpawnPeriod = enemySpawnPeriodMax;
-  enemyBossRate = settings["enemyBossRate"];
+  bigEnemyRate = currentDifficulty.bigEnemyRate;
 
-  smallMonsterAcceleration = settings["smallMonsterAcceleration"];
-  smallMonsterMaxSpeed = settings["smallMonsterMaxSpeed"];
-  bigMonsterAcceleration = settings["bigMonsterAcceleration"];
-  bigMonsterMaxSpeed = settings["bigMonsterMaxSpeed"];
+  smallMonsterAcceleration = currentDifficulty.smallMonsterAcceleration;
+  smallMonsterMaxSpeed = currentDifficulty.smallMonsterMaxSpeed;
+  bigMonsterAcceleration = currentDifficulty.bigMonsterAcceleration;
+  bigMonsterMaxSpeed = currentDifficulty.bigMonsterMaxSpeed;
+
+  bossHealthMax = currentDifficulty.bossHealthMax;
+  sockShootingFrame = 0;
 
   gameIsStarting = false;
 
@@ -1491,19 +1666,37 @@ function startGame(difficulty, data){
 
 function setGameState(state){
   gameState = state;
-  gameStateFuncs[state]();
 }
 
 
-/// CLEANUP (prevent memory leaks from arrows flying off the screen)
+/// CLEANUP (prevent memory leaks from sprites flying off the screen)
 function cleanup(){
-  for(var i = 0; i < allSprites.length; i++){
-    var x = allSprites[i].position.x;
-    var y = allSprites[i].position.y;
-    if(x > canvasWidth || x < 0 || y > canvasHeight || y < 0){
-      allSprites[i].remove();
+  const allSpritesCopy = allSprites.slice();
+  for(var i = 0; i < allSpritesCopy.length; i++){
+    var x = allSpritesCopy[i].position.x;
+    var y = allSpritesCopy[i].position.y;
+    if(-canvasWidth > x || x > 2*canvasWidth || -canvasHeight > y || y > 2*canvasHeight){
+      allSpritesCopy[i].remove();
     }
   }
+}
+
+
+function createArrow(posX, posY, direction) {
+  var arrow = createSprite(posX, posY);
+  arrow.addImage(arrowImage);
+  arrow.scale = 0.35;
+
+  let dx = cos(direction);
+  let dy = sin(direction);
+
+  arrow.rotation = 45 + 360 * direction / (2*PI);
+  arrow.attractionPoint(playerArrowSpeed, posX + dx, posY + dy);
+  arrow.maxSpeed = playerArrowSpeed;
+  arrow.tag = { direction: direction, maxSpeed: playerArrowSpeed }
+  arrow.debug = debugSprites;
+  arrow.setCollider("rectangle", 0, 0, 20, 20);
+  arrows.add(arrow);
 }
 
 
@@ -1514,23 +1707,27 @@ function mousePressed(){
       var arrow = createSprite(player.position.x, player.position.y);
       arrow.addImage(arrowImage);
       arrow.scale = 0.35;
-      console.log(arrow);
+    }
+    
+    if(mouseX < canvasWidth && mouseX >= 0 && mouseY < canvasHeight && mouseY >= 0){      
+      var arrow = createSprite(player.position.x, player.position.y);
+      arrow.addImage(arrowImage);
+      arrow.scale = 0.35;
       
       // calculate rotation, default points NE
       var x_diff = mouseX - player.position.x;
       var y_diff = mouseY - player.position.y;
-      var true_theta = Math.atan(y_diff / x_diff);
-      var theta = 45 + true_theta * 180 / Math.PI;
+      var theta = Math.atan(y_diff / x_diff);
       if(mouseX < player.position.x){
-        theta += 180;
+        theta += PI;
       }
-      arrow.rotation = theta;
       
-      arrow.attractionPoint(playerArrowSpeed, mouseX, mouseY);
-      arrow.debug = debugSprites;
-      arrow.setCollider("rectangle", 0, 0, 20, 20);
-      arrows.add(arrow);
-      console.log(arrows);
+      createArrow(player.position.x, player.position.y, theta);
+      // createArrow(player.position.x, player.position.y, theta + PI / 16);
+      // createArrow(player.position.x, player.position.y, theta - PI / 16);
+      // createArrow(player.position.x, player.position.y, theta + PI / 32);
+      // createArrow(player.position.x, player.position.y, theta - PI / 32);
+      
       playerArrows--;
       if(sfxOn) twangSfx.play();
     }
@@ -1585,7 +1782,7 @@ function keyPressed(){
       s.debug = debugSprites;
     });
   }
-  // period toggles legacy sfx (easter egg)
+
   if(keyCode == 190){
     toggleLegacySfx();
   }
