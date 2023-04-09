@@ -1500,7 +1500,6 @@ function damagePlayer(enemy){
     enemy.tag.otherSock.remove();
   }
   else{
-    console.log(enemy.velocity.x, enemy.tag.health)
     playerSpeedX += enemy.velocity.x * enemy.tag.health / 40;
     playerSpeedY += enemy.velocity.y * enemy.tag.health / 40;
   }
@@ -1738,11 +1737,8 @@ function mousePressed(){
 }
 
 function keyPressed(){
-  // Space
-  if(keyCode === 32 && !gameIsOver){
-    if(gameState === STARTING){
-    }
-    else if(gameState === PAUSED){
+  if(key === " " && !gameIsOver){
+    if(gameState === PAUSED){
       if(showingSettings){
         showingSettings = false;
       }
@@ -1755,8 +1751,8 @@ function keyPressed(){
       setGameState(PAUSED);
     }
   }
-  // escape key
-  if(keyCode === 27){
+
+  if(key === "Escape"){
     if(showingSettings) showingSettings = false;
     if(gameState === STARTING){
     }
@@ -1767,23 +1763,23 @@ function keyPressed(){
     else if(gameState === PAUSED){
     }
   }
-  // press 1, Q, F, or X to activate hotbar item 1
-  if([49, 81, 70, 88].indexOf(keyCode) >= 0){
+
+  if(["1", "q", "Q"].includes(key)){
     doFreeze();
   }
-  // press 2, E, G, or C to activate hotbar item 2
-  if([50, 69, 71, 67].indexOf(keyCode) >= 0){
+
+  if(["2", "e", "E"].includes(key)){
     doKillall();
   }
-  // H to toggle showing hitboxes
-  if(keyCode === 72){
+
+  if(key === "h" || key === "H"){
     debugSprites = !debugSprites;
     allSprites.forEach(s => {
       s.debug = debugSprites;
     });
   }
 
-  if(keyCode == 190){
+  if(key === "."){
     toggleLegacySfx();
   }
 }
