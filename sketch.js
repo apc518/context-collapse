@@ -12,6 +12,7 @@ let drawSafeRadius = false;
 const STARTING = 0;
 const PLAYING = 1;
 const PAUSED = 2;
+let gameState = STARTING;
 
 const FRAMERATE = 60;
 
@@ -73,6 +74,8 @@ const allSounds = [];
 let difficultyString;
 let difficultyColor;
 let currentDifficulty;
+
+let velocityCache = [];
 
 let enemyGroup;
 let bigEnemyGroup;
@@ -1066,6 +1069,54 @@ function playerControls(){
 }
 
 
+/// NON-PLAYER MOVEMENT
+function attractMonsters(){
+  if(!freezing){
+    for(var i = 0; i < enemyGroup.length; i++){
+      monster = enemyGroup[i];
+      monster.attractionPoint(smallMonsterAcceleration, player.position.x, player.position.y);
+      monster.maxSpeed = smallMonsterMaxSpeed;
+    }
+    for(var i = 0; i < bigEnemyGroup.length; i++){
+      monster = bigEnemyGroup[i];
+      monster.attractionPoint(bigMonsterAcceleration, player.position.x, player.position.y);
+      monster.maxSpeed = bigMonsterMaxSpeed;
+    }
+    for(let i = 0; i < bossGroup.length; i++){
+      monster = bossGroup[i];
+      monster.attractionPoint(0.01, player.position.x, player.position.y);
+      monster.maxSpeed = 0.5;
+    }
+  }
+}
+
+function attractProjectiles(){
+  for (const projectileList of [arrows, sockGroup]){
+    for (const projectile of projectileList){
+      let dx = cos(projectile.tag.direction);
+      let dy = sin(projectile.tag.direction);
+      
+      projectile.maxSpeed = projectile.tag.maxSpeed;
+
+      projectile.attractionPoint(projectile.maxSpeed, projectile.position.x + dx, projectile.position.y + dy);
+    }
+  }
+}
+
+
+/// GENERAL MOVEMENT
+function cacheVelocities() {
+  velocityCache = allSprites.map(s => ({ sprite: s, velocity: { x: s.velocity.x, y: s.velocity.y} }));
+}
+
+function restoreVelocities(){
+  velocityCache.map(vc => {
+    vc.sprite.velocity.x = vc.velocity.x;
+    vc.sprite.velocity.y = vc.velocity.y;
+  })
+}
+
+
 /// UTILITY
 function wrangleCoords(x, y){
   // returns coordinates that are always inside of the canvas
@@ -1333,41 +1384,6 @@ function createMonster(x, y){
 
 function bossIsAlive() {
   return bossGroup.length > 0;
-}
-
-
-/// NON-PLAYER MOVEMENT
-function attractMonsters(){
-  if(!freezing){
-    for(var i = 0; i < enemyGroup.length; i++){
-      monster = enemyGroup[i];
-      monster.attractionPoint(smallMonsterAcceleration, player.position.x, player.position.y);
-      monster.maxSpeed = smallMonsterMaxSpeed;
-    }
-    for(var i = 0; i < bigEnemyGroup.length; i++){
-      monster = bigEnemyGroup[i];
-      monster.attractionPoint(bigMonsterAcceleration, player.position.x, player.position.y);
-      monster.maxSpeed = bigMonsterMaxSpeed;
-    }
-    for(let i = 0; i < bossGroup.length; i++){
-      monster = bossGroup[i];
-      monster.attractionPoint(0.01, player.position.x, player.position.y);
-      monster.maxSpeed = 0.5;
-    }
-  }
-}
-
-function attractProjectiles(){
-  for (const projectileList of [arrows, sockGroup]){
-    for (const projectile of projectileList){
-      let dx = cos(projectile.tag.direction);
-      let dy = sin(projectile.tag.direction);
-      
-      projectile.maxSpeed = projectile.tag.maxSpeed;
-
-      projectile.attractionPoint(projectile.maxSpeed, projectile.position.x + dx, projectile.position.y + dy);
-    }
-  }
 }
 
 
@@ -1663,8 +1679,15 @@ function startGame(difficulty, seed){
   setGameState(PLAYING);
 }
 
-function setGameState(state){
-  gameState = state;
+function setGameState(newState){
+  oldState = gameState;
+  gameState = newState;
+  if (oldState === PLAYING && newState === PAUSED){
+    cacheVelocities();
+  }
+  else if (oldState === PAUSED && newState === PLAYING){
+    restoreVelocities();
+  }
 }
 
 
