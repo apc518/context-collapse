@@ -1560,7 +1560,7 @@ function equipFreeze(freeze){
 
 /// POWERUP EXECUTION
 function doKillall(){
-  if(killallEquipped){
+  if(killallEquipped && gameState === PLAYING){
     if(sfxOn) killallSfx.play();
 
     scoreBeforeKillall = score;
@@ -1592,7 +1592,7 @@ function doKillall(){
 }
 
 function doFreeze(){
-  if(freezeEquipped){
+  if(freezeEquipped  && gameState === PLAYING){
     if(sfxOn) freezeSfx.play();
     freezing = true;
     pauseMonsters();
