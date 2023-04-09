@@ -94,8 +94,9 @@ let bigMonsterMaxSpeed;
 
 let bossHealthMax;
 const bossValue = 50;
+const bossSpawnScoreDefault = 100;
 const bossSpawnScoreInterval = 150;
-let bossSpawnScore = 100;
+let bossSpawnScore = bossSpawnScoreDefault;
 const sockSpeed = 7;
 
 const bigEnemyHealthMax = 80;
@@ -141,7 +142,7 @@ function mod(n, m){
 }
 
 // initialize gameplay-related variables that are independent of difficulty
-function initAgnosticGlobalVars(){
+function initializeDifficultyAgnosticGlobals(){
   setGameState(STARTING);
   gameIsStarting = true;
   gameIsOver = false;
@@ -175,6 +176,9 @@ function initAgnosticGlobalVars(){
 
   enemySpawnFrame = 0;
   bigEnemyRateMultiplierIsActive = false;
+
+  bossSpawnScore = bossSpawnScoreDefault;
+  sockShootingFrame = 0;
 
   leaderboard = null;
 }
@@ -244,7 +248,7 @@ function setup(){
     }).then(() => clickablesDisabled = false);
   }
 
-  initAgnosticGlobalVars();
+  initializeDifficultyAgnosticGlobals();
 
   enemyGroup = new Group();
   bigEnemyGroup = new Group();
@@ -726,7 +730,7 @@ function drawStartScreen(){
   pop();
 
   textAlign(CENTER);
-  textSize(32);
+  textSize(28);
   fill("#aaa");
   text("Select difficulty", canvasWidth / 2, canvasHeight / 2 - 30);
 
@@ -1614,7 +1618,7 @@ function resetLevel(){
   updateHighscore();
 
   // intialize agnostic globals again
-  initAgnosticGlobalVars();
+  initializeDifficultyAgnosticGlobals();
 
   // reset player
   player.position.x = canvasWidth / 2;
@@ -1672,7 +1676,6 @@ function startGame(difficulty, seed){
   bigMonsterMaxSpeed = currentDifficulty.bigMonsterMaxSpeed;
 
   bossHealthMax = currentDifficulty.bossHealthMax;
-  sockShootingFrame = 0;
 
   gameIsStarting = false;
 
