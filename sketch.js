@@ -117,9 +117,10 @@ let authToken;
 
 let sweetAlerting = false;
 
-let sfxOn = true;
-let musicOn = false;
 let useLegacySfx = false;
+let sfxOn = true;
+let musicOn = true;
+let music;
 
 // button constants
 const btnHoverColor = "#ff9";
@@ -218,11 +219,12 @@ function preload(){
   for(let i = 0; i < 5; i++) bigEnemyFreezeImages.push(loadImage("images/enemy-big-freeze" + i + ".png"));
 }
 
-function loadSound(path, vol=1, rate=1){
+function loadSound(path, vol=1, rate=1, html5=false){
   return new Howl({
     src: [path],
     volume: vol,
-    rate: rate
+    rate: rate,
+    html5: html5
   });
 }
 
@@ -276,8 +278,7 @@ function setup(){
   healthPackSfx = loadSound("audio/health_bottle_3.wav");
   menuClickSfx = loadSound("audio/collider-boom-clave.wav", 0.5);
   sockSfx = loadSound("audio/sock_1.wav", 0.5, 5);
-  music = loadSound("audio/newmayphobia.mp3", 0.5);
-  music.loop(true);
+  
 
   if(!('highscores' in localStorage)){
     localStorage['highscores'] = JSON.stringify({easy: 0, normal: 0, hard: 0});
@@ -1632,6 +1633,11 @@ function resetLevel(){
 }
 
 function registerGame(difficulty){
+  if (!music){
+    music = loadSound("audio/newmayphobia.mp3", 0.5, 1, true);
+    music.loop(true);
+  }
+
   if(!music.playing() && musicOn)
     music.play();
   
