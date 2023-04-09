@@ -1317,7 +1317,7 @@ function createMonster(x, y){
   else if(rng() > bigEnemyRate && (bossCount > 1 || !bossIsAlive())){
     // normal monster
     monster.addImage(enemyImage);
-    monster.setCollider("rectangle", 0, 0, 42, 54);
+    monster.setCollider("rectangle", 0, 0, 38, 50);
     monster.tag = new MetaObj(health=enemyHealthMax, strength=10);
     enemyGroup.add(monster);
   }
