@@ -95,7 +95,7 @@ let bigMonsterMaxSpeed;
 let bossHealthMax;
 const bossValue = 50;
 const bossSpawnScoreDefault = 100;
-const bossSpawnScoreInterval = 150;
+const bossSpawnScoreInterval = 200;
 let bossSpawnScore = bossSpawnScoreDefault;
 const sockSpeed = 7;
 
@@ -1332,7 +1332,7 @@ function spawnMonster(){
     var y_ = Math.sin(theta) * length;
     
     var coords = wrangleCoords(player.position.x + x_, player.position.y + y_);
-
+    
     createMonster(...coords);
     
     enemySpawnPeriod = max(enemySpawnPeriodMin, enemySpawnPeriod * enemySpawnAcceleration);
