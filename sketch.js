@@ -97,7 +97,7 @@ const sockSpeed = 7;
 
 const bigEnemyHealthMax = 80;
 const enemyHealthMax = 20;
-const safeRadius = 320; // monsters dont spawn immediately on or next to the player
+const safeRadius = 360; // monsters dont spawn immediately on or next to the player
 
 // chance that a bigEnemy DOESN'T spawn is multiplied by this every time a monster spawns
 // this will only activate after the enemySpawnPeriod has reached its minimum.
@@ -1500,8 +1500,8 @@ function damagePlayer(enemy){
     enemy.tag.otherSock.remove();
   }
   else{
-    playerSpeedX += enemy.velocity.x * enemy.tag.health / 40;
-    playerSpeedY += enemy.velocity.y * enemy.tag.health / 40;
+    playerSpeedX += enemy.velocity.x * enemy.tag.health / 30;
+    playerSpeedY += enemy.velocity.y * enemy.tag.health / 30;
   }
 
   if(playerHealth <= 0){
@@ -1636,7 +1636,7 @@ function startGame(difficulty, seed){
 
   player = createSprite(canvasWidth / 2, canvasHeight / 2, playerWidth, playerHeight); 
   player.addImage(playerImage);
-  player.setCollider("rectangle", 0, 0, playerWidth, playerHeight);
+  player.setCollider("circle", 0, 5, playerWidth / 2);
   player.debug = debugSprites;
   player.depth = 2;
   players.add(player);
