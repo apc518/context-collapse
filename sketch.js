@@ -91,6 +91,8 @@ let smallMonsterAcceleration;
 let smallMonsterMaxSpeed;
 let bigMonsterAcceleration;
 let bigMonsterMaxSpeed;
+const monsterAccelerationVariance = 0.2;
+const monsterMaxSpeedVariance = 0.2;
 
 let bossHealthMax;
 const bossValue = 50;
@@ -1104,13 +1106,13 @@ function attractMonsters(){
   if(!freezing){
     for(var i = 0; i < enemyGroup.length; i++){
       monster = enemyGroup[i];
-      monster.attractionPoint(smallMonsterAcceleration, player.position.x, player.position.y);
-      monster.maxSpeed = smallMonsterMaxSpeed;
+      monster.attractionPoint(monster.tag.acceleration, player.position.x, player.position.y);
+      monster.maxSpeed = monster.tag.maxSpeed;
     }
     for(var i = 0; i < bigEnemyGroup.length; i++){
       monster = bigEnemyGroup[i];
-      monster.attractionPoint(bigMonsterAcceleration, player.position.x, player.position.y);
-      monster.maxSpeed = bigMonsterMaxSpeed;
+      monster.attractionPoint(monster.tag.acceleration, player.position.x, player.position.y);
+      monster.maxSpeed = monster.tag.maxSpeed;
     }
     for(let i = 0; i < bossGroup.length; i++){
       monster = bossGroup[i];
@@ -1400,6 +1402,8 @@ function createMonster(x, y){
     monster.addImage(enemyImage);
     monster.setCollider("rectangle", 0, 0, 38, 50);
     monster.tag = new MetaObj(health=enemyHealthMax, strength=10);
+    monster.tag.acceleration = smallMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
+    monster.tag.maxSpeed = smallMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
     enemyGroup.add(monster);
   }
   else if (bossCount > 2 || !bossIsAlive()){
@@ -1408,6 +1412,8 @@ function createMonster(x, y){
     monster.scale = 0.5;
     monster.setCollider("circle", 0, -3, 110);
     monster.tag = new MetaObj(health=bigEnemyHealthMax, strength=30, value=3, bigEnemy=true);
+    monster.tag.acceleration = bigMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
+    monster.tag.maxSpeed = bigMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
     bigEnemyGroup.add(monster);
   }
 }
