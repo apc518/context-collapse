@@ -167,10 +167,10 @@ function initializeDifficultyAgnosticGlobals(){
   arrowBunchSpawnFrame = 0;
   playerArrows = arrowBunchSize;
   
-  killallEquipped = true;
+  killlallsEquipped = 1;
   killallAbilityPrevSpawn = 0; // seconds that a killall ability is available for before it disappears
 
-  freezeEquipped = true;
+  freezesEquipped = 1;
   freezing = false; // whether or not it is currently active.
   freezeTimer = 0;
   freezePrevSpawn = 0;
@@ -228,6 +228,12 @@ function loadSound(path, vol=1, rate=1, html5=false){
   });
 }
 
+function playSound(howl){
+  if (!howl.maxPolyphony || howl.playing() < howl.maxPolyphony){
+    howl.play();
+  }
+}
+
 function setup(){
   p5canvas = createCanvas(canvasWidth, canvasHeight);
   p5canvas.parent("p5_canvas");
@@ -269,6 +275,7 @@ function setup(){
   iceClinkSfx = loadSound("audio/ice_clink_1.wav");
   iceBreakSfx = loadSound("audio/ice_break_1.wav");
   monsterDeathSfx = loadSound("audio/monster_death_1.wav", 0.5);
+  monsterDeathSfx.maxPolyphony = 3;
   chainSfx = loadSound("audio/chain_rattle.wav", 0.2);
   killallSfx = loadSound("audio/fire_impact_1.wav");
   killallEquipSfx = loadSound("audio/snow_punch_2.wav");
@@ -404,7 +411,7 @@ function setupSettingsIcon(){
   settingsButton.strokeWeight = 0;
   settingsButton.text = "";
   settingsButton.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     showingSettings = true;
     if(gameState === PLAYING) {
       setGameState(PAUSED);
@@ -434,7 +441,7 @@ function setupSettingsMenu(){
   sfxToggleBtn.onPress = () => {
     sfxOn = !sfxOn;
     sfxToggleBtn.image = sfxOn ? sfxOnIcon : sfxOffIcon;
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
   }
   sfxToggleBtn.onHover = () => {
     sfxToggleBtn.color = btnHoverColor;
@@ -477,7 +484,7 @@ function setupSettingsMenu(){
   okayButton.locate(canvasWidth / 2 - okayButtonSize / 2, canvasHeight / 2 - okayButtonSize / 2 + sfxToggleBtnSize + 10);
   okayButton.resize(64,64);
   okayButton.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     showingSettings = false;
     if(gameState === PAUSED && !gameIsOver && !pauseScreen){
       setGameState(PLAYING);
@@ -508,7 +515,7 @@ function setupStartScreen(){
   easyBtn.textSize = 20;
   easyBtn.textFont = globalFont;
   easyBtn.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     registerGame("easy", difficultySettings);
   }
   easyBtn.onHover = () => {
@@ -525,7 +532,7 @@ function setupStartScreen(){
   normBtn.textSize = 20;
   normBtn.textFont = globalFont;
   normBtn.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     registerGame("normal", difficultySettings);
   }
   normBtn.onHover = () => {
@@ -542,7 +549,7 @@ function setupStartScreen(){
   hardBtn.textSize = 20;
   hardBtn.textFont = globalFont;
   hardBtn.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     registerGame("hard", difficultySettings);
   }
   hardBtn.onHover = () => {
@@ -559,7 +566,7 @@ function setupStartScreen(){
   leaderboardBtn.textSize = 24;
   leaderboardBtn.textFont = globalFont;
   leaderboardBtn.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     fetchLeaderboard();
   }
   leaderboardBtn.onHover = () => {
@@ -609,7 +616,7 @@ function setupLeaderboard(){
   backBtn.textSize = 24;
   backBtn.textFont = globalFont;
   backBtn.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     showingLeaderboard = false;
   }
   backBtn.onHover = () => {
@@ -636,7 +643,7 @@ function setupLeaderboard(){
     }
     btn.onPress = () => {
       if(leaderboardPage + increment < 1) return;
-      if(sfxOn) menuClickSfx.play();
+      if(sfxOn) playSound(menuClickSfx);
       leaderboardPage = Math.max(1, leaderboardPage + increment);
       fetchLeaderboard();
     }
@@ -657,7 +664,7 @@ function setupGameOverScreen(){
   submitScoreBtn.textSize = 24;
   submitScoreBtn.textFont = globalFont;
   submitScoreBtn.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     submitHighScore();
   }
   submitScoreBtn.onHover = () => {
@@ -682,7 +689,7 @@ function setupGameOverScreen(){
   restartBtn.textSize = 24;
   restartBtn.textFont = globalFont;
   restartBtn.onPress = () => {
-    if(sfxOn) menuClickSfx.play();
+    if(sfxOn) playSound(menuClickSfx);
     clickablesDisabled = true;
     Swal.fire({
       title: gameIsOver ? "Are you sure you want to exit?" : "Are you sure you want to quit?",
@@ -759,30 +766,48 @@ function drawPowerups(){
   fill(60, 127);
   ellipse(offset, canvasHeight - offset, size);
   fill(140);
-  text("1", offset, canvasHeight - offset);
-  for (let i = 1; i < 2; i++) {
-    fill(60, 127);
-    ellipse(offset + i*(size + spacing), canvasHeight - offset, size);
-    fill(140);
-    text(i+1, offset + i*(size + spacing), canvasHeight - offset);
-  }
+  text("Q", offset, canvasHeight - offset);
+  fill(60, 127);
+  ellipse(offset + (size + spacing), canvasHeight - offset, size);
+  fill(140);
+  text("E", offset + (size + spacing), canvasHeight - offset);
   pop();
 
   // killall powerup
-  if(freezeEquipped){
+  if(freezesEquipped > 0){
     push();
     imageMode(CENTER);
     translate(offset, canvasHeight - offset);
     image(freezeAbilityImage, 0, 0, size, size);
+    
+    if (freezesEquipped > 1){
+      textSize(18);
+      textFont(globalFont);
+      stroke(0);
+      fill(btnHoverColor);
+      strokeWeight(3);
+      textAlign(CENTER);
+      text(freezesEquipped, 18, 18);
+    }
     pop();
   }
 
   // freeze powerup
-  if(killallEquipped){
+  if(killlallsEquipped > 0){
     push();
     imageMode(CENTER);
     translate(offset + size + spacing, canvasHeight - offset);
     image(killallAbilityImage, 0, 0, size, size);
+    
+    if (killlallsEquipped > 1){
+      textSize(18);
+      textFont(globalFont);
+      stroke(0);
+      fill(btnHoverColor);
+      strokeWeight(3);
+      textAlign(CENTER);
+      text(killlallsEquipped, 18, 18);
+    }
     pop();
   }
 }
@@ -1404,7 +1429,7 @@ function shootSocks() {
   const sockTargetSpread = PI / 3;
   
   if (gameFrame >= sockShootingFrame){
-    if (sfxOn) sockSfx.play();
+    if (sfxOn) playSound(sockSfx);
     const bossPos = [bossGroup[0].position.x, bossGroup[0].position.y];
     const theta = atan((player.position.y - bossPos[1]) / (player.position.x - bossPos[0])) + rng() * sockTargetSpread - (sockTargetSpread / 2) + (player.position.x < bossPos[0] ? PI : 0);
     const sockTarget = [bossPos[0] + cos(theta), bossPos[1] + sin(theta)];
@@ -1488,24 +1513,29 @@ function damageEnemy(enemy, arrow){
     
     if(!gameIsOver) score += enemy.tag.value;
     if(sfxOn) {
-      if(freezing) iceBreakSfx.play();
-      else monsterDeathSfx.play();
+      if(freezing) playSound(iceBreakSfx);
+      else playSound(monsterDeathSfx);
     }
     ret = 0;
   }
   else if(enemy.tag.isBigEnemy){
+    // display corresponding damage level
     var idx = Math.floor(4 * enemy.tag.health / bigEnemyHealthMax);
     enemy.addImage(bigEnemyDamageImages[idx]);
-    enemy.velocity.x = 0;
-    enemy.velocity.y = 0;
+    
+    // knockback from arrow
+    if (arrow){
+      enemy.velocity.x = 0;
+      enemy.velocity.y = 0;
+    }
   }
 
   if(arrow !== null){
     arrows.remove(arrow);
     arrow.remove();
     if(sfxOn){
-      if(freezing) iceClinkSfx.play();
-      else hitSfx.play();
+      if(freezing) playSound(iceClinkSfx);
+      else playSound(hitSfx);
     }
   }
 
@@ -1513,7 +1543,7 @@ function damageEnemy(enemy, arrow){
 }
 
 function damagePlayer(enemy){
-  if(sfxOn) playerDamageSfx.play();
+  if(sfxOn && playerDamageSfx.playing() < 5) playerDamageSfx.play();
   
   playerHealth -= enemy.tag.strength;
 
@@ -1548,20 +1578,20 @@ function healPlayer(healthPack){
 
 function equipKillall(killallAbility){
   killallAbility.remove();
-  if(sfxOn) killallEquipSfx.play();
-  killallEquipped = true;
+  if(sfxOn) playSound(killallEquipSfx);
+  killlallsEquipped += 1;
 }
 
 function equipFreeze(freeze){
   freeze.remove();
-  if(sfxOn) killallEquipSfx.play();
-  freezeEquipped = true;
+  if(sfxOn) playSound(killallEquipSfx);
+  freezesEquipped += 1;
 }
 
 /// POWERUP EXECUTION
 function doKillall(){
-  if(killallEquipped && gameState === PLAYING){
-    if(sfxOn) killallSfx.play();
+  if(killlallsEquipped > 0 && gameState === PLAYING){
+    if(sfxOn) playSound(killallSfx);
 
     scoreBeforeKillall = score;
 
@@ -1587,17 +1617,17 @@ function doKillall(){
     }
 
     score = scoreBeforeKillall;
-    killallEquipped = false;
+    killlallsEquipped -= 1;
   }
 }
 
 function doFreeze(){
-  if(freezeEquipped  && gameState === PLAYING){
-    if(sfxOn) freezeSfx.play();
+  if(freezesEquipped > 0 && gameState === PLAYING){
+    if(sfxOn) playSound(freezeSfx);
     freezing = true;
     pauseMonsters();
     freezeTimer = 5;
-    freezeEquipped = false;
+    freezesEquipped -= 1;
   }
 }
 
@@ -1611,7 +1641,7 @@ function gameOver(){
   playerHealth = 0;
   gameIsOver = true;
   player.addImage(playerDeadImage);
-  if(sfxOn) playerDeathSfx.play();
+  if(sfxOn) playSound(playerDeathSfx);
 }
 
 function resetLevel(){
@@ -1760,7 +1790,7 @@ function mousePressed(){
       // createArrow(player.position.x, player.position.y, theta - PI / 32);
       
       playerArrows--;
-      if(sfxOn) twangSfx.play();
+      if(sfxOn) playSound(twangSfx);
     }
     else{
       setGameState(PAUSED);
