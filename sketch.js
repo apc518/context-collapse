@@ -164,6 +164,7 @@ function initializeGameplayGlobals(){
 
   enemySpawnFrame = 0;
   bigEnemyRateMultiplierIsActive = false;
+  bigEnemyRate = endlessSettings.bigEnemyRate;
 
   bossCount = 0;
   bossSpawnScore = bossSpawnScoreDefault;
@@ -1682,7 +1683,7 @@ function resetLevel(){
   player.position.y = canvasHeight / 2;
   player.addImage(playerImage);
 
-  enemySpawnPeriod = enemySpawnPeriodMax;
+  enemySpawnPeriod = endlessSettings.enemySpawnPeriodMax;
 
   // destroy all sprites
   while(allSprites.length > 0) allSprites[0].remove();
