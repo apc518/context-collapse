@@ -2,7 +2,7 @@
 CONTEXT COLLAPSE by Andy Chamberlain
 */
 
-VERSION = "1.0.0";
+const CONTEXT_COLLAPSE_VERSION = "1.0.0";
 
 // dev
 let debugSprites = false;
@@ -13,11 +13,12 @@ const STARTING = 0;
 const PLAYING = 1;
 const PAUSED = 2;
 let gameState = STARTING;
+let gameFrame = 0;
 
 const FRAMERATE = 60;
 
 // canvas
-const canvasHeight = 900;
+const canvasHeight = 800;
 const canvasWidth = canvasHeight;
 let p5canvas;
 
@@ -40,18 +41,15 @@ let rng; // a function produced by mulberry32()
   }
 }
 */
-const replay = {};
+let inputProvider;
 
 // player stuff
 const playerWidth = 64;
 const playerHeight = 64;
-
 const playerMoveForce = 0.9;
 const playerFriction = 0.1;
 const playerStrength = 20;
-
 const playerArrowSpeed = 15;
-
 const playerHealthMax = 100;
 
 // health pack item constants
@@ -71,30 +69,15 @@ const freezeSpawnPeriod = 50 * FRAMERATE;
 
 const allSounds = [];
 
-let difficultyString;
-let difficultyColor;
-let currentDifficulty;
-
 let velocityCache = [];
 
 let enemyGroup;
 let bigEnemyGroup;
 let bossGroup;
 
-let enemySpawnPeriodMin;
-let enemySpawnPeriodMax;
-let enemySpawnPeriod;
-let enemySpawnAcceleration; // enemySpawnPeriod gets multiplied by this on every spawn
-let bigEnemyRate;
-
-let smallMonsterAcceleration;
-let smallMonsterMaxSpeed;
-let bigMonsterAcceleration;
-let bigMonsterMaxSpeed;
 const monsterAccelerationVariance = 0.2;
 const monsterMaxSpeedVariance = 0.2;
 
-let bossHealthMax;
 const bossValue = 50;
 const bossSpawnScoreDefault = 100;
 const bossSpawnScoreInterval = 200;
@@ -103,7 +86,7 @@ const sockSpeed = 7;
 
 const bigEnemyHealthMax = 80;
 const enemyHealthMax = 20;
-const safeRadius = 360; // monsters dont spawn immediately on or next to the player
+const safeRadius = 340; // monsters dont spawn immediately on or next to the player
 
 // chance that a bigEnemy DOESN'T spawn is multiplied by this every time a monster spawns
 // this will only activate after the enemySpawnPeriod has reached its minimum.
@@ -121,7 +104,7 @@ let sweetAlerting = false;
 
 let useLegacySfx = false;
 let sfxOn = true;
-let musicOn = true;
+let musicOn = false;
 let music;
 
 // button constants
@@ -144,8 +127,8 @@ function mod(n, m){
   return ((n % m) + m) % m;
 }
 
-// initialize gameplay-related variables that are independent of difficulty
-function initializeDifficultyAgnosticGlobals(){
+// initialize gameplay-related variables
+function initializeGameplayGlobals(){
   setGameState(STARTING);
   gameIsStarting = true;
   gameIsOver = false;
@@ -169,17 +152,20 @@ function initializeDifficultyAgnosticGlobals(){
   arrowBunchSpawnFrame = 0;
   playerArrows = arrowBunchSize;
   
-  killlallsEquipped = 1;
+  killlallsEquipped = 0;
   killallAbilityPrevSpawn = 0; // seconds that a killall ability is available for before it disappears
 
-  freezesEquipped = 1;
+  freezesEquipped = 0;
   freezing = false; // whether or not it is currently active.
   freezeTimer = 0;
   freezePrevSpawn = 0;
 
+  enemySpawnPeriod = endlessSettings.enemySpawnPeriodMax;
+
   enemySpawnFrame = 0;
   bigEnemyRateMultiplierIsActive = false;
 
+  bossCount = 0;
   bossSpawnScore = bossSpawnScoreDefault;
   sockShootingFrame = 0;
 
@@ -258,7 +244,7 @@ function setup(){
     }).then(() => clickablesDisabled = false);
   }
 
-  initializeDifficultyAgnosticGlobals();
+  initializeGameplayGlobals();
 
   enemyGroup = new Group();
   bigEnemyGroup = new Group();
@@ -348,6 +334,15 @@ function draw(){
     else drawStartScreen();
   }
   else if(gameState === PLAYING){
+    const pressEvents = inputProvider.getPressEventsByGameFrame(gameFrame);
+    const currentInputs = inputProvider.getInputsByGameFrame(gameFrame);
+    for (const k of pressEvents.keys){
+      doKeyPressedAction(k);
+    }
+    if (pressEvents.mouse){
+      doMousePressedAction(currentInputs.mousePosition.x, currentInputs.mousePosition.y);
+    }
+
     spawnMonster();
     spawnArrowBunch();
     spawnHealthPack();
@@ -376,14 +371,11 @@ function draw(){
     _drawSprites();
     drawPowerups();
     drawStats();
-    if(gameIsOver && showingSettings){
+    if(showingSettings){
       drawSettingsMenu();
     }
     else if (gameIsOver){
       drawGameOverScreen();
-    }
-    else if(showingSettings){
-      drawSettingsMenu();
     }
     else{
       drawPauseScreen();
@@ -395,6 +387,7 @@ function draw(){
     fill("white");
     noStroke();
     textFont(globalFont);
+    textAlign(CENTER);
     text("Unknown game state.", canvasWidth / 2, canvasHeight / 2)
     pop();
   }
@@ -507,65 +500,51 @@ function setupFreezeTimer(){
   }, 1000);
 }
 
+const startScreenButtonSize = [170, 60];
+const startScreenButtonTextSize = 24;
+
 function setupStartScreen(){
   frameRate(FRAMERATE);
-
-  easyBtn = new Clickable();
-  easyBtn.locate(canvasWidth / 2 - 150, canvasHeight / 2);
-  easyBtn.resize(100, 40);
-  easyBtn.text = "Easy";
-  easyBtn.textSize = 20;
-  easyBtn.textFont = globalFont;
-  easyBtn.onPress = () => {
+  
+  endlessBtn = new Clickable();
+  endlessBtn.locate(canvasWidth / 2 - 170, canvasHeight / 2);
+  endlessBtn.resize(...startScreenButtonSize);
+  endlessBtn.text = "Endless";
+  endlessBtn.textSize = startScreenButtonTextSize;
+  endlessBtn.textFont = globalFont;
+  endlessBtn.onPress = () => {
     if(sfxOn) playSound(menuClickSfx);
-    registerGame("easy", difficultySettings);
+    registerGame();
   }
-  easyBtn.onHover = () => {
-    easyBtn.color = btnHoverColor;
+  endlessBtn.onHover = () => {
+    endlessBtn.color = btnHoverColor;
   }
-  easyBtn.onOutside = () => {
-    easyBtn.color = btnDefaultColor;
+  endlessBtn.onOutside = () => {
+    endlessBtn.color = btnDefaultColor;
   }
   
-  normBtn = new Clickable();
-  normBtn.locate(canvasWidth / 2 - 50, canvasHeight / 2);
-  normBtn.resize(100, 40);
-  normBtn.text = "Normal";
-  normBtn.textSize = 20;
-  normBtn.textFont = globalFont;
-  normBtn.onPress = () => {
+  campaignBtn = new Clickable();
+  campaignBtn.locate(canvasWidth / 2, canvasHeight / 2);
+  campaignBtn.resize(...startScreenButtonSize);
+  campaignBtn.text = "Campaign";
+  campaignBtn.textSize = startScreenButtonTextSize;
+  campaignBtn.textFont = globalFont;
+  campaignBtn.onPress = () => {
     if(sfxOn) playSound(menuClickSfx);
-    registerGame("normal", difficultySettings);
+    setGameState("unknown");
   }
-  normBtn.onHover = () => {
-    normBtn.color = btnHoverColor;
+  campaignBtn.onHover = () => {
+    campaignBtn.color = btnHoverColor;
   }
-  normBtn.onOutside = () => {
-    normBtn.color = btnDefaultColor;
-  }
-  
-  hardBtn = new Clickable();
-  hardBtn.locate(canvasWidth / 2 + 50, canvasHeight / 2);
-  hardBtn.resize(100, 40);
-  hardBtn.text = "Hard";
-  hardBtn.textSize = 20;
-  hardBtn.textFont = globalFont;
-  hardBtn.onPress = () => {
-    if(sfxOn) playSound(menuClickSfx);
-    registerGame("hard", difficultySettings);
-  }
-  hardBtn.onHover = () => {
-    hardBtn.color = btnHoverColor;
-  }
-  hardBtn.onOutside = () => {
-    hardBtn.color = btnDefaultColor;
+  campaignBtn.onOutside = () => {
+    campaignBtn.color = btnDefaultColor;
   }
 
   leaderboardBtn = new Clickable();
-  leaderboardBtn.resize(170, 60);
+  leaderboardBtn.resize(...startScreenButtonSize);
   leaderboardBtn.locate(canvasWidth / 2 - leaderboardBtn.width / 2, canvasHeight / 2 + 100);
   leaderboardBtn.text = "Leaderboard";
-  leaderboardBtn.textSize = 24;
+  leaderboardBtn.textSize = startScreenButtonTextSize;
   leaderboardBtn.textFont = globalFont;
   leaderboardBtn.onPress = () => {
     if(sfxOn) playSound(menuClickSfx);
@@ -579,7 +558,7 @@ function setupStartScreen(){
   }
 
   helpBtn = new Clickable();
-  helpBtn.resize(170, 60);
+  helpBtn.resize(...startScreenButtonSize);
   helpBtn.locate(canvasWidth / 2 - helpBtn.width / 2, canvasHeight / 2 + 210);
   helpBtn.text = "How To Play";
   helpBtn.textSize = 24;
@@ -608,14 +587,17 @@ function setupStartScreen(){
   helpBtn.onOutside = () => {
     helpBtn.color = btnDefaultColor;
   }
+
+  replayBtn = new Clickable();
+  replayBtn.resize(...startScreenButtonSize);
 }
 
 function setupLeaderboard(){
   backBtn = new Clickable();
-  backBtn.resize(170, 60);
+  backBtn.resize(...startScreenButtonSize);
   backBtn.locate(canvasWidth / 2 - backBtn.width / 2, canvasHeight / 2 + 150);
   backBtn.text = "Back";
-  backBtn.textSize = 24;
+  backBtn.textSize = startScreenButtonTextSize;
   backBtn.textFont = globalFont;
   backBtn.onPress = () => {
     if(sfxOn) playSound(menuClickSfx);
@@ -742,12 +724,11 @@ function drawStartScreen(){
   textAlign(CENTER);
   textSize(28);
   fill("#aaa");
-  text("Select difficulty", canvasWidth / 2, canvasHeight / 2 - 30);
+  text("Select gamemode", canvasWidth / 2, canvasHeight / 2 - 30);
 
   fill("white");
-  easyBtn.draw();
-  normBtn.draw();
-  hardBtn.draw();
+  endlessBtn.draw();
+  campaignBtn.draw();
   leaderboardBtn.draw();
   helpBtn.draw();
 
@@ -780,7 +761,9 @@ function drawPowerups(){
     push();
     imageMode(CENTER);
     translate(offset, canvasHeight - offset);
+    tint(255, 127);
     image(freezeAbilityImage, 0, 0, size, size);
+    tint(255);
     
     if (freezesEquipped > 1){
       textSize(18);
@@ -799,7 +782,9 @@ function drawPowerups(){
     push();
     imageMode(CENTER);
     translate(offset + size + spacing, canvasHeight - offset);
+    tint(255, 127);
     image(killallAbilityImage, 0, 0, size, size);
+    tint(255);
     
     if (killlallsEquipped > 1){
       textSize(18);
@@ -823,7 +808,7 @@ function drawStats(){
   text("Score: " + score, 8, 32);
   push();
   textSize(16);
-  fill(difficultyColor);
+  fill(btnHoverColor);
   text("High: " + getHighScore(), 8, 52);
   pop();
 
@@ -831,11 +816,11 @@ function drawStats(){
   textAlign(CENTER);
   text("Arrows: " + playerArrows, canvasWidth / 2, 32);
 
-  // Difficulty
+  // Gamemode
   push();
-  fill(difficultyColor);
+  fill("#4c4");
   textAlign(RIGHT);
-  text(difficultyString, canvasWidth - 8, 32);
+  text("Endless", canvasWidth - 8, 32);
   pop();
  
   // health bar
@@ -888,7 +873,8 @@ function drawPauseScreen(){
 function drawCursor(){
   push();
   imageMode(CENTER);
-  image(crosshairImage, mouseX, mouseY, 48, 48);
+  const currentInputs = inputProvider.getInputsByGameFrame(gameFrame);
+  image(crosshairImage, currentInputs.mousePosition.x, currentInputs.mousePosition.y, 48, 48);
   pop();
 }
 
@@ -958,14 +944,16 @@ function drawLeaderboard(){
 
     const alignBias = canvasWidth / 6 - 10;
     
-    fill(difficultySettings.easy.color);
+    fill(endlessSettings.easy.color);
     text(easyLeaderboardString, canvasWidth / 6 - alignBias, 80);
-    fill(difficultySettings.normal.color);
+    fill(endlessSettings.normal.color);
     text(normalLeaderboardString, canvasWidth / 2 - alignBias, 80);
-    fill(difficultySettings.hard.color);
+    fill(endlessSettings.hard.color);
     text(hardLeaderboardString, canvasWidth - canvasWidth / 6 - alignBias, 80);
   }
   catch(e){
+    push();
+    textAlign(CENTER);
     if(leaderboardError){
       fill(255, 127, 127);
       text("Error loading leaderboard. Try again later.", canvasWidth / 2, 280);
@@ -974,6 +962,7 @@ function drawLeaderboard(){
       fill(255);
       text("Loading...", canvasWidth / 2, 280);
     }
+    pop();
   }
 
   backBtn.draw();
@@ -1048,17 +1037,18 @@ function assignImages(){
 function incrementVelocity(){
   let x = 0;
   let y = 0;
+  const currentInputs = inputProvider.getInputsByGameFrame(gameFrame);
   // create a unit vector from pressed keys
-  if(keyIsDown(UP_ARROW) || keyIsDown(87)){
+  if(currentInputs.keysPressed.includes("w")){
     y -= 1;
   }
-  if(keyIsDown(DOWN_ARROW) || keyIsDown(83)){
+  if(currentInputs.keysPressed.includes("s")){
     y += 1;
   }
-  if(keyIsDown(RIGHT_ARROW) || keyIsDown(68)){
+  if(currentInputs.keysPressed.includes("d")){
     x += 1;
   }
-  if(keyIsDown(LEFT_ARROW) || keyIsDown(65)){
+  if(currentInputs.keysPressed.includes("a")){
     x -= 1;
   }
 
@@ -1216,7 +1206,6 @@ function submitHighScore(){
         body: JSON.stringify({
           name: localStorage.name,
           score: score,
-          difficulty: difficultyString.toLowerCase(),
         })
       })
       .then(res => {
@@ -1267,19 +1256,14 @@ function toggleLegacySfx(){
 }
 
 function updateHighscore(){
-  // set highscore according to current value of difficultyString
-  if(!difficultyString) return;
-
-  let highscores = JSON.parse(localStorage.highscores);
-  highscores[difficultyString.toLowerCase()] = Math.max(highscores[difficultyString.toLowerCase()], score);
-  localStorage.highscores = JSON.stringify(highscores);
+  let highscore = parseInt(localStorage.highscore);
+  highscore = Math.max(highscore, score);
+  localStorage.highscore = highscore;
 }
 
 function getHighScore(){
-  if(!difficultyString) return;
-
-  let highscores = JSON.parse(localStorage.highscores);
-  return highscores[difficultyString.toLowerCase()];
+  let highscore = localStorage.highscore;
+  return parseInt(highscore);
 }
 
 // src: https://github.com/cprosche/mulberry32
@@ -1363,9 +1347,9 @@ function spawnMonster(){
     
     createMonster(...coords);
     
-    enemySpawnPeriod = max(enemySpawnPeriodMin, enemySpawnPeriod * enemySpawnAcceleration);
+    enemySpawnPeriod = max(endlessSettings.enemySpawnPeriodMin, enemySpawnPeriod * endlessSettings.enemySpawnAcceleration);
 
-    if(enemySpawnPeriod <= enemySpawnPeriodMin){
+    if(enemySpawnPeriod <= endlessSettings.enemySpawnPeriodMin){
       bigEnemyRateMultiplierIsActive = true;
       arrowSpawnPeriod = arrowSpawnPeriodAfterBigEnemyRateMultiplier;
     }
@@ -1390,20 +1374,20 @@ function createMonster(x, y){
 
     monster.addImage(bossManImage);
     monster.setCollider("circle", 0, 0, 135);
-    monster.tag = new MetaObj(health=bossHealthMax, strength=200, value=bossValue);
+    monster.tag = new MetaObj(health=endlessSettings.bossHealthMax, strength=200, value=bossValue);
     monster.tag.isBoss = true;
     bossGroup.add(monster);
     monster.scale = 1.4;
     bossSpawnScore += bossSpawnScoreInterval;
     bossCount += 1;
   }
-  else if(rng() > bigEnemyRate && (bossCount > 1 || !bossIsAlive())){
+  else if(rng() > endlessSettings.bigEnemyRate && (bossCount > 1 || !bossIsAlive())){
     // normal monster
     monster.addImage(enemyImage);
     monster.setCollider("rectangle", 0, 0, 38, 50);
     monster.tag = new MetaObj(health=enemyHealthMax, strength=10);
-    monster.tag.acceleration = smallMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
-    monster.tag.maxSpeed = smallMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
+    monster.tag.acceleration = endlessSettings.smallMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
+    monster.tag.maxSpeed = endlessSettings.smallMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
     enemyGroup.add(monster);
   }
   else if (bossCount > 2 || !bossIsAlive()){
@@ -1412,8 +1396,8 @@ function createMonster(x, y){
     monster.scale = 0.5;
     monster.setCollider("circle", 0, -3, 110);
     monster.tag = new MetaObj(health=bigEnemyHealthMax, strength=30, value=3, bigEnemy=true);
-    monster.tag.acceleration = bigMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
-    monster.tag.maxSpeed = bigMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
+    monster.tag.acceleration = endlessSettings.bigMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
+    monster.tag.maxSpeed = endlessSettings.bigMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
     bigEnemyGroup.add(monster);
   }
 }
@@ -1648,6 +1632,42 @@ function gameOver(){
   gameIsOver = true;
   player.addImage(playerDeadImage);
   if(sfxOn) playSound(playerDeathSfx);
+
+  // make recording
+  const recording = {
+    replayVersion: InputProvider.version,
+    gameVersion: CONTEXT_COLLAPSE_VERSION,
+    seed: gameSeed,
+    inputs: inputProvider.generatedReplayData
+  }
+
+  const blob = new Blob([JSON.stringify(recording)], { type: 'text/json' });
+
+  // Create an object URL from the Blob
+  const objectUrl = URL.createObjectURL(blob);
+
+  clickablesDisabled = true;
+  Swal.fire({
+    title: 'Save Replay File',
+    showCancelButton: true,
+    allowOutsideClick: false
+  }).then((result) => {
+    if (result.isConfirmed) {
+      // Create a download link element
+      const downloadLink = document.createElement('a');
+      downloadLink.href = objectUrl;
+      downloadLink.download = `context-collapse-${Date.now()}.replay.json`;
+      downloadLink.style.display = 'none';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    }
+
+    // Revoke the object URL
+    URL.revokeObjectURL(objectUrl);
+
+    clickablesDisabled = false;
+  });
 }
 
 function resetLevel(){
@@ -1655,7 +1675,7 @@ function resetLevel(){
   updateHighscore();
 
   // intialize agnostic globals again
-  initializeDifficultyAgnosticGlobals();
+  initializeGameplayGlobals();
 
   // reset player
   player.position.x = canvasWidth / 2;
@@ -1668,16 +1688,27 @@ function resetLevel(){
   while(allSprites.length > 0) allSprites[0].remove();
 }
 
-function registerGame(difficulty){
+
+function replayGame(replayData) {
+  console.assert(replayData.gameVersion === CONTEXT_COLLAPSE_VERSION, "replay file game version and current game version do not match");
+  console.assert(replayData.replayVersion === InputProvider.version, "replay input version is unsupported");
+  inputProvider = new InputProvider(replayData.inputs);
+  startGame(replayData.seed);
+}
+
+
+function registerGame(){
   if (!music){
     music = loadSound("audio/newmayphobia.mp3", 0.5, 1, true);
     music.loop(true);
   }
 
-  if(!music.playing() && musicOn)
+  if(!music.playing() && musicOn){
     music.play();
-  
-  startGame(difficulty, Math.floor(Math.random() * 1_000_000_000));
+  }
+
+  inputProvider = new InputProvider();
+  startGame(Math.floor(Math.random() * 1_000_000_000));
 
   fetch(`${serverURLBase}/leaderboard`)
     .then(res => {
@@ -1692,7 +1723,7 @@ function registerGame(difficulty){
     });
 }
 
-function startGame(difficulty, seed){
+function startGame(seed){
   gameSeed = seed;
   rng = mulberry32(gameSeed);
 
@@ -1702,22 +1733,6 @@ function startGame(difficulty, seed){
   player.debug = debugSprites;
   player.depth = 2;
   players.add(player);
-
-  currentDifficulty = difficultySettings[difficulty];
-  difficultyString = currentDifficulty.name;
-  difficultyColor = currentDifficulty.color;
-  enemySpawnPeriodMax = currentDifficulty.enemySpawnPeriodMax;
-  enemySpawnPeriodMin = currentDifficulty.enemySpawnPeriodMin;
-  enemySpawnAcceleration = currentDifficulty.enemySpawnAcceleration;
-  enemySpawnPeriod = enemySpawnPeriodMax;
-  bigEnemyRate = currentDifficulty.bigEnemyRate;
-
-  smallMonsterAcceleration = currentDifficulty.smallMonsterAcceleration;
-  smallMonsterMaxSpeed = currentDifficulty.smallMonsterMaxSpeed;
-  bigMonsterAcceleration = currentDifficulty.bigMonsterAcceleration;
-  bigMonsterMaxSpeed = currentDifficulty.bigMonsterMaxSpeed;
-
-  bossHealthMax = currentDifficulty.bossHealthMax;
 
   gameIsStarting = false;
 
@@ -1768,24 +1783,24 @@ function createArrow(posX, posY, direction) {
 
 
 /// INPUT EVENTS
-function mousePressed(){
+function doMousePressedAction(_mouseX, _mouseY){
   if(gameState === PLAYING && playerArrows > 0){
-    if(mouseX < canvasWidth && mouseX >= 0 && mouseY < canvasHeight && mouseY >= 0){
+    if(_mouseX < canvasWidth && _mouseX >= 0 && _mouseY < canvasHeight && _mouseY >= 0){
       var arrow = createSprite(player.position.x, player.position.y);
       arrow.addImage(arrowImage);
       arrow.scale = 0.35;
     }
     
-    if(mouseX < canvasWidth && mouseX >= 0 && mouseY < canvasHeight && mouseY >= 0){      
+    if(_mouseX < canvasWidth && _mouseX >= 0 && _mouseY < canvasHeight && _mouseY >= 0){      
       var arrow = createSprite(player.position.x, player.position.y);
       arrow.addImage(arrowImage);
       arrow.scale = 0.35;
       
       // calculate rotation, default points NE
-      var x_diff = mouseX - player.position.x;
-      var y_diff = mouseY - player.position.y;
+      var x_diff = _mouseX - player.position.x;
+      var y_diff = _mouseY - player.position.y;
       var theta = Math.atan(y_diff / x_diff);
-      if(mouseX < player.position.x){
+      if(_mouseX < player.position.x){
         theta += PI;
       }
       
@@ -1804,6 +1819,17 @@ function mousePressed(){
   }
 }
 
+function doKeyPressedAction(_key){
+  if(["1", "q", "Q"].includes(_key)){
+    doFreeze();
+  }
+  
+  if(["2", "e", "E"].includes(_key)){
+    doKillall();
+  }
+}
+
+// only for non-gameplay controls (pausing, changing non-functional aesthetics)
 function keyPressed(){
   if(key === " " && !gameIsOver){
     if(gameState === PAUSED){
@@ -1819,7 +1845,7 @@ function keyPressed(){
       setGameState(PAUSED);
     }
   }
-
+  
   if(key === "Escape"){
     if(showingSettings) showingSettings = false;
     if(gameState === STARTING){
@@ -1830,14 +1856,6 @@ function keyPressed(){
     }
     else if(gameState === PAUSED){
     }
-  }
-
-  if(["1", "q", "Q"].includes(key)){
-    doFreeze();
-  }
-
-  if(["2", "e", "E"].includes(key)){
-    doKillall();
   }
 
   if(key === "h" || key === "H"){
