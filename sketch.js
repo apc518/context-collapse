@@ -12,6 +12,8 @@ let drawSafeRadius = false;
 const STARTING = 0;
 const PLAYING = 1;
 const PAUSED = 2;
+const ERROR = 3;
+let gameErrorMessage = "An unknown error occurred :(";
 let gameState = STARTING;
 let gameFrame = 0;
 
@@ -385,11 +387,12 @@ function draw(){
   else{
     push();
     textSize(24);
-    fill("white");
+    fill(255, 150, 150);
     noStroke();
     textFont(globalFont);
     textAlign(CENTER);
-    text("Unknown game state.", canvasWidth / 2, canvasHeight / 2)
+    text(gameErrorMessage, canvasWidth / 2, canvasHeight / 2);
+    backBtn.draw();
     pop();
   }
 
@@ -532,7 +535,8 @@ function setupStartScreen(){
   campaignBtn.textFont = globalFont;
   campaignBtn.onPress = () => {
     if(sfxOn) playSound(menuClickSfx);
-    setGameState("unknown");
+    gameErrorMessage = "Campaign mode is not supported yet";
+    setGameState(ERROR);
   }
   campaignBtn.onHover = () => {
     campaignBtn.color = btnHoverColor;
@@ -603,6 +607,9 @@ function setupLeaderboard(){
   backBtn.onPress = () => {
     if(sfxOn) playSound(menuClickSfx);
     showingLeaderboard = false;
+    if (gameState === ERROR) {
+      setGameState(STARTING);
+    }
   }
   backBtn.onHover = () => {
     backBtn.color = btnHoverColor;
@@ -737,7 +744,7 @@ function drawStartScreen(){
 }
 
 function drawPowerups(){
-  let offset = 36;
+  let offset = 32;
   let size = 48;
   let spacing = 5;
 
@@ -845,13 +852,16 @@ function drawGameOverScreen(){
     textAlign(CENTER);
     text("Final score: " + score, canvasWidth / 2, canvasHeight / 2);
 
+    if (score > getHighScore()){
+      fill("#ff8");
+      textSize(36)
+      text("New High Score!", canvasWidth / 2, canvasHeight / 2 - 70);
+    }
+    
     if(networkError){
       submitScoreBtnDisabled.draw();
     }
     else if (score > getHighScore()){
-      fill("#ff8");
-      textSize(36)
-      text("New High Score!", canvasWidth / 2, canvasHeight / 2 - 70);
       submitScoreBtn.draw();
     }
 
@@ -1002,7 +1012,7 @@ function drawBossHealthBars(){
     rect(boss.position.x + bossHbOffsetX, boss.position.y + bossHbOffsetY, bossHbWidth, bossHbHeight);
     noStroke();
     fill(255, 0, 0, 80);
-    rect(boss.position.x + bossHbOffsetX, boss.position.y + bossHbOffsetY, bossHbWidth * boss.tag.health / currentDifficulty.bossHealthMax, bossHbHeight);
+    rect(boss.position.x + bossHbOffsetX, boss.position.y + bossHbOffsetY, bossHbWidth * boss.tag.health / endlessSettings.bossHealthMax, bossHbHeight);
     pop();
   }
 }
@@ -1257,9 +1267,17 @@ function toggleLegacySfx(){
 }
 
 function updateHighscore(){
+  if (localStorage.highscores) {
+    localStorage.removeItem("highscores");
+  }
   let highscore = parseInt(localStorage.highscore);
-  highscore = Math.max(highscore, score);
-  localStorage.highscore = highscore;
+  if (Number.isFinite(highscore)){
+    highscore = Math.max(highscore, score);
+    localStorage.highscore = highscore;
+  }
+  else{
+    localStorage.highscore = score;
+  }
 }
 
 function getHighScore(){
