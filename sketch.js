@@ -547,7 +547,7 @@ function setupStartScreen(){
 
   leaderboardBtn = new Clickable();
   leaderboardBtn.resize(...startScreenButtonSize);
-  leaderboardBtn.locate(canvasWidth / 2 - leaderboardBtn.width / 2, canvasHeight / 2 + 100);
+  leaderboardBtn.locate(canvasWidth / 2 - leaderboardBtn.width / 2, canvasHeight / 2 + 80);
   leaderboardBtn.text = "Leaderboard";
   leaderboardBtn.textSize = startScreenButtonTextSize;
   leaderboardBtn.textFont = globalFont;
@@ -564,7 +564,7 @@ function setupStartScreen(){
 
   helpBtn = new Clickable();
   helpBtn.resize(...startScreenButtonSize);
-  helpBtn.locate(canvasWidth / 2 - helpBtn.width / 2, canvasHeight / 2 + 210);
+  helpBtn.locate(canvasWidth / 2 - helpBtn.width / 2, canvasHeight / 2 + 160);
   helpBtn.text = "How To Play";
   helpBtn.textSize = 24;
   helpBtn.textFont = globalFont;
@@ -593,8 +593,34 @@ function setupStartScreen(){
     helpBtn.color = btnDefaultColor;
   }
 
+  replayFileInput = document.createElement("input");
+  replayFileInput.style.hidden = true;
+  replayFileInput.type = "file";
+  replayFileInput.addEventListener('change', e => {
+    if (e.target.files[0]){
+      e.target.files[0].text().then(res => {
+        console.log(res);
+        replayGame(JSON.parse(res));
+      });
+    }
+  });
+
   replayBtn = new Clickable();
   replayBtn.resize(...startScreenButtonSize);
+  replayBtn.locate(canvasWidth / 2 - helpBtn.width / 2, canvasHeight / 2 + 240);
+  replayBtn.text = "Load a Replay";
+  replayBtn.textSize = 24;
+  replayBtn.textFont = globalFont;
+  replayBtn.onPress = () => {
+    if(sfxOn) menuClickSfx.play();
+    replayFileInput.click();
+  }
+  replayBtn.onHover = () => {
+    replayBtn.color = btnHoverColor;
+  }
+  replayBtn.onOutside = () => {
+    replayBtn.color = btnDefaultColor;
+  }
 }
 
 function setupLeaderboard(){
@@ -739,6 +765,7 @@ function drawStartScreen(){
   campaignBtn.draw();
   leaderboardBtn.draw();
   helpBtn.draw();
+  replayBtn.draw();
 
   pop();
 }
