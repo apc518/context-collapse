@@ -1,12 +1,12 @@
 document.addEventListener('keydown', (e) => {
-    const key = e.key;
+    const key = e.key.toLowerCase();
     if (!InputProvider.pressedKeys.includes(key)) {
         InputProvider.pressedKeys.push(key);
     }
 });
 
 document.addEventListener('keyup', (e) => {
-    const key = e.key;
+    const key = e.key.toLowerCase();
     const index = InputProvider.pressedKeys.indexOf(key);
     if (index !== -1) {
         InputProvider.pressedKeys.splice(index, 1);
@@ -16,7 +16,7 @@ document.addEventListener('keyup', (e) => {
 window.addEventListener("blur", () => { InputProvider.pressedKeys.splice(0, InputProvider.pressedKeys.length) });
 
 /**
- * provide and record input in the form of keys currently Prs, whether the mouse is Prs, and where the mouse is
+ * provide and record input in the form of keys currently pressed, whether the mouse is pressed, and where the mouse is
  * optionally provide a frame number
  * 
  * replay data is indexed by *game frame* not by real frame.
@@ -40,7 +40,7 @@ window.addEventListener("blur", () => { InputProvider.pressedKeys.splice(0, Inpu
  *   1?,  // whether mouse is pressed. 1 if the mouse is pressed, not present if not (when coerced to boolean, equivalent to true/false)
  * ]
  * 
- * NOTE: for serializing, mouse position is only listed when it has changed since the previous frame
+ * IDEA: maybe for serializing, only list mouse position when it has changed since the previous frame
  */
 class InputProvider {
     static pressedKeys = [];

@@ -52,13 +52,13 @@ const playerMoveForce = 0.9;
 const playerFriction = 0.1;
 const playerStrength = 20;
 const playerArrowSpeed = 15;
-const playerHealthMax = 100;
+const playerHealthMax = 200;
 
 // health pack item constants
 const healthPackEmbargo = 10 * FRAMERATE;
 const healthPackSpawnPeriodAverage = 10 * FRAMERATE;
 const healthPackSpawnVariance = 3 * FRAMERATE;
-const healthBarWidth = 200;
+const healthBarWidth = 300;
 
 // arrow item constants
 const arrowBunchSize = 8;
@@ -144,7 +144,7 @@ function initializeGameplayGlobals(){
 
   playerSpeedX = 0;
   playerSpeedY = 0;
-  playerHealth = playerHealthMax;
+  playerHealth = playerHealthMax / 2;
 
   healthPackSpawnPeriod = healthPackSpawnPeriodAverage;
   healthPackPrevSpawn = 0;
@@ -230,7 +230,7 @@ function setup(){
   p5canvas.parent("p5_canvas");
 
   const volumeControl = document.getElementById("volumeSlider");
-  volumeControl.oninput = e => {
+  volumeControl.oninput = () => {
     Howler.volume(volumeControl.value / 100);
   }
   // initial volume
@@ -330,13 +330,16 @@ function _drawSprites(){
 
 function draw(){
   background(backgroundImage);
+  document.getElementById("volumeSlider").disabled = false;
   if(gameState === STARTING){
     cursor(ARROW, mouseX, mouseY);
     if(showingSettings) drawSettingsMenu();
     else if(showingLeaderboard) drawLeaderboard();
     else drawStartScreen();
+    drawSettingsIcon();
   }
   else if(gameState === PLAYING){
+    document.getElementById("volumeSlider").disabled = true;
     const pressEvents = inputProvider.getPressEventsByGameFrame(gameFrame);
     const currentInputs = inputProvider.getInputsByGameFrame(gameFrame);
     for (const k of pressEvents.keys){
@@ -364,6 +367,7 @@ function draw(){
     drawCursor();
     cleanup();
     drawSafeFromSpawningArea();
+    drawReplayIndicator();
     if(freezeTimer === 0) freezing = false;
     gameFrame++;
   }
@@ -374,6 +378,7 @@ function draw(){
     _drawSprites();
     drawPowerups();
     drawStats();
+    drawSettingsIcon();
     if(showingSettings){
       drawSettingsMenu();
     }
@@ -394,9 +399,8 @@ function draw(){
     text(gameErrorMessage, canvasWidth / 2, canvasHeight / 2);
     backBtn.draw();
     pop();
+    drawSettingsIcon();
   }
-
-  drawSettingsIcon();
 }
 
 
@@ -593,6 +597,7 @@ function setupStartScreen(){
       html: `
       Move with WASD, shoot by clicking.<br/><br/>
       There are two powerup slots which can be activated by the Q and E keys respectively.<br/><br/>
+      You can force new monsters to spawn by pressing shift (e.g. if you wanted to speed up the early game)<br/><br/>
       <a class="game-details" href="https://github.com/apc518/context-collapse/blob/master/Game_Details.md" target="_blank" rel="noreferrer">More Details</a>
       <br/>
       `
@@ -616,7 +621,6 @@ function setupStartScreen(){
   replayFileInput.addEventListener('change', e => {
     if (e.target.files[0]){
       e.target.files[0].text().then(res => {
-        console.log(res);
         replayGame(JSON.parse(res));
       });
     }
@@ -1043,6 +1047,18 @@ function drawSafeFromSpawningArea(){
   }
 }
 
+function drawReplayIndicator(){
+  if (inputProvider.givenReplayData){
+    push();
+    noStroke();
+    textAlign(RIGHT);
+    textSize(16);
+    fill("#faa");
+    text("Replay", canvasWidth - 8, 52);
+    pop();
+  }
+}
+
 function drawBossHealthBars(){
   const bossHbOffsetX = -148;
   const bossHbOffsetY = -150;
@@ -1397,8 +1413,8 @@ function spawnArrowBunch(){
   }
 }
 
-function spawnMonster(){
-  if(enemySpawnFrame <= gameFrame && !freezing){
+function spawnMonster(force){
+  if(force || (enemySpawnFrame <= gameFrame && !freezing)){
     // create a random vector pointing out from the player, length half of the canvasWidth
     
     var length = rng() * (canvasWidth / 2 - safeRadius) + safeRadius; // hypotenuse
@@ -1579,8 +1595,8 @@ function damageEnemy(enemy, arrow){
     
     // knockback from arrow
     if (arrow){
-      enemy.velocity.x = 0;
-      enemy.velocity.y = 0;
+      enemy.velocity.x += arrow.velocity.x / 8;
+      enemy.velocity.y += arrow.velocity.y / 8;
     }
   }
 
@@ -1710,28 +1726,31 @@ function gameOver(){
   // Create an object URL from the Blob
   const objectUrl = URL.createObjectURL(blob);
 
-  clickablesDisabled = true;
-  Swal.fire({
-    title: 'Save Replay File',
-    showCancelButton: true,
-    allowOutsideClick: false
-  }).then((result) => {
-    if (result.isConfirmed) {
-      // Create a download link element
-      const downloadLink = document.createElement('a');
-      downloadLink.href = objectUrl;
-      downloadLink.download = `context-collapse-${Date.now()}.replay.json`;
-      downloadLink.style.display = 'none';
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-    }
+  if (!inputProvider.givenReplayData){
+    clickablesDisabled = true;
 
-    // Revoke the object URL
-    URL.revokeObjectURL(objectUrl);
-
-    clickablesDisabled = false;
-  });
+    Swal.fire({
+      title: 'Save Replay File',
+      showCancelButton: true,
+      allowOutsideClick: false
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Create a download link element
+        const downloadLink = document.createElement('a');
+        downloadLink.href = objectUrl;
+        downloadLink.download = `context-collapse-${Date.now()}.replay.json`;
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      }
+  
+      // Revoke the object URL
+      URL.revokeObjectURL(objectUrl);
+  
+      clickablesDisabled = false;
+    });
+  }
 }
 
 function resetLevel(){
@@ -1774,17 +1793,17 @@ function registerGame(){
   inputProvider = new InputProvider();
   startGame(Math.floor(Math.random() * 1_000_000_000));
 
-  fetch(`${serverURLBase}/leaderboard`)
-    .then(res => {
-      res.json().then(() => {
-        networkError = false;
-      }).catch(() => {
-        networkError = false;
-      });
-    })
-    .catch(e => {
-      networkError = true;
-    });
+  // fetch(`${serverURLBase}/leaderboard`)
+  //   .then(res => {
+  //     res.json().then(() => {
+  //       networkError = false;
+  //     }).catch(() => {
+  //       networkError = false;
+  //     });
+  //   })
+  //   .catch(e => {
+  //     networkError = true;
+  //   });
 }
 
 function startGame(seed){
@@ -1829,7 +1848,7 @@ function cleanup(){
 
 
 function createArrow(posX, posY, direction) {
-  var arrow = createSprite(posX, posY);
+  let arrow = createSprite(posX, posY);
   arrow.addImage(arrowImage);
   arrow.scale = 0.35;
 
@@ -1842,24 +1861,19 @@ function createArrow(posX, posY, direction) {
   arrow.tag = { direction: direction, maxSpeed: playerArrowSpeed }
   arrow.debug = debugSprites;
   arrow.setCollider("rectangle", 0, 0, 20, 20);
+  
+  // kickback
+  playerSpeedX -= arrow.velocity.x / 6;
+  playerSpeedY -= arrow.velocity.y / 6;
+  
   arrows.add(arrow);
 }
 
 
 /// INPUT EVENTS
 function doMousePressedAction(_mouseX, _mouseY){
-  if(gameState === PLAYING && playerArrows > 0){
-    if(_mouseX < canvasWidth && _mouseX >= 0 && _mouseY < canvasHeight && _mouseY >= 0){
-      var arrow = createSprite(player.position.x, player.position.y);
-      arrow.addImage(arrowImage);
-      arrow.scale = 0.35;
-    }
-    
-    if(_mouseX < canvasWidth && _mouseX >= 0 && _mouseY < canvasHeight && _mouseY >= 0){      
-      var arrow = createSprite(player.position.x, player.position.y);
-      arrow.addImage(arrowImage);
-      arrow.scale = 0.35;
-      
+  if(gameState === PLAYING && playerArrows > 0){    
+    if(_mouseX < canvasWidth && _mouseX >= 0 && _mouseY < canvasHeight && _mouseY >= 0){     
       // calculate rotation, default points NE
       var x_diff = _mouseX - player.position.x;
       var y_diff = _mouseY - player.position.y;
@@ -1869,6 +1883,8 @@ function doMousePressedAction(_mouseX, _mouseY){
       }
       
       createArrow(player.position.x, player.position.y, theta);
+
+      // multishot?
       // createArrow(player.position.x, player.position.y, theta + PI / 16);
       // createArrow(player.position.x, player.position.y, theta - PI / 16);
       // createArrow(player.position.x, player.position.y, theta + PI / 32);
@@ -1884,12 +1900,17 @@ function doMousePressedAction(_mouseX, _mouseY){
 }
 
 function doKeyPressedAction(_key){
-  if(["1", "q", "Q"].includes(_key)){
+  if(["1", "q"].includes(_key)){
     doFreeze();
   }
   
-  if(["2", "e", "E"].includes(_key)){
+  if(["2", "e"].includes(_key)){
     doKillall();
+  }
+
+  if(["shift"].includes(_key)){
+    console.log("shift was pressed");
+    spawnMonster(true);
   }
 }
 
