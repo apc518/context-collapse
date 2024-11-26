@@ -510,6 +510,23 @@ const startScreenButtonTextSize = 24;
 function setupStartScreen(){
   frameRate(FRAMERATE);
   
+  playBtn = new Clickable();
+  playBtn.resize(...startScreenButtonSize);
+  playBtn.locate(canvasWidth / 2 - playBtn.width / 2, canvasHeight / 2);
+  playBtn.text = "Play";
+  playBtn.textSize = startScreenButtonTextSize;
+  playBtn.textFont = globalFont;
+  playBtn.onPress = () => {
+    if(sfxOn) playSound(menuClickSfx);
+    registerGame();
+  }
+  playBtn.onHover = () => {
+    playBtn.color = btnHoverColor;
+  }
+  playBtn.onOutside = () => {
+    playBtn.color = btnDefaultColor;
+  }
+
   endlessBtn = new Clickable();
   endlessBtn.locate(canvasWidth / 2 - 170, canvasHeight / 2);
   endlessBtn.resize(...startScreenButtonSize);
@@ -607,7 +624,7 @@ function setupStartScreen(){
 
   replayBtn = new Clickable();
   replayBtn.resize(...startScreenButtonSize);
-  replayBtn.locate(canvasWidth / 2 - helpBtn.width / 2, canvasHeight / 2 + 240);
+  replayBtn.locate(canvasWidth / 2 - replayBtn.width / 2, canvasHeight / 2 + 80);
   replayBtn.text = "Load a Replay";
   replayBtn.textSize = 24;
   replayBtn.textFont = globalFont;
@@ -758,12 +775,13 @@ function drawStartScreen(){
   textAlign(CENTER);
   textSize(28);
   fill("#aaa");
-  text("Select gamemode", canvasWidth / 2, canvasHeight / 2 - 30);
+  // text("Select gamemode", canvasWidth / 2, canvasHeight / 2 - 30);
 
   fill("white");
-  endlessBtn.draw();
-  campaignBtn.draw();
-  leaderboardBtn.draw();
+  playBtn.draw();
+  // endlessBtn.draw();
+  // campaignBtn.draw();
+  // leaderboardBtn.draw();
   helpBtn.draw();
   replayBtn.draw();
 
