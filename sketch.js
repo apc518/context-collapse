@@ -86,7 +86,7 @@ const bossSpawnScoreInterval = 200;
 let bossSpawnScore = bossSpawnScoreDefault;
 const sockSpeed = 11;
 
-const bigEnemyHealthMax = 80;
+const bigEnemyHealthMax = 100;
 const enemyHealthMax = 20;
 const safeRadius = 340; // monsters dont spawn immediately on or next to the player
 
@@ -154,7 +154,7 @@ function initializeGameplayGlobals(){
   arrowBunchSpawnFrame = 0;
   playerArrows = arrowBunchSize;
   
-  killlallsEquipped = 0;
+  killallsEquipped = 0;
   killallAbilityPrevSpawn = 0; // seconds that a killall ability is available for before it disappears
 
   freezesEquipped = 0;
@@ -328,6 +328,24 @@ function _drawSprites(){
   drawBossHealthBars();
 }
 
+
+const getCircularReplacer = () => {
+  const seen = new WeakSet();
+  return (key, value) => {
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) {
+        return;
+      }
+      seen.add(value);
+    }
+    return value;
+  };
+};
+
+let previousAllSpritesJson = null;
+let currentAllSpritesJson = null;
+
+
 function draw(){
   background(backgroundImage);
   document.getElementById("volumeSlider").disabled = false;
@@ -346,6 +364,12 @@ function draw(){
       gameOver();
     }
     else{
+      // currentAllSpritesJson = JSON.stringify(allSprites, getCircularReplacer());
+
+      // if (previousAllSpritesJson && (previousAllSpritesJson != currentAllSpritesJson)){
+      //   console.error("Found a discrepancy between", previousAllSpritesJson, "and", currentAllSpritesJson);
+      // }
+
       for (const k of pressEvents.keys){
         doKeyPressedAction(k);
       }
@@ -353,7 +377,7 @@ function draw(){
         doMousePressedAction(currentInputs.mousePosition.x, currentInputs.mousePosition.y);
       }
   
-      // spawnMonster();
+      spawnMonster();
       spawnArrowBunch();
       spawnHealthPack();
       spawnKillallAbility();
@@ -374,6 +398,8 @@ function draw(){
       drawReplayIndicator();
       if(freezeTimer === 0) freezing = false;
       gameFrame++;
+
+      previousAllSpritesJson = JSON.stringify(allSprites, getCircularReplacer());
     }
   }
   else if(gameState === PAUSED){ // includes game over
@@ -840,7 +866,7 @@ function drawPowerups(){
   }
 
   // freeze powerup
-  if(killlallsEquipped > 0){
+  if(killallsEquipped > 0){
     push();
     imageMode(CENTER);
     translate(offset + size + spacing, canvasHeight - offset);
@@ -848,14 +874,14 @@ function drawPowerups(){
     image(killallAbilityImage, 0, 0, size, size);
     tint(255);
     
-    if (killlallsEquipped > 1){
+    if (killallsEquipped > 1){
       textSize(18);
       textFont(globalFont);
       stroke(0);
       fill(btnHoverColor);
       strokeWeight(3);
       textAlign(CENTER);
-      text(killlallsEquipped, 18, 18);
+      text(killallsEquipped, 18, 18);
     }
     pop();
   }
@@ -1658,7 +1684,7 @@ function healPlayer(healthPack){
 function equipKillall(killallAbility){
   killallAbility.remove();
   if(sfxOn) playSound(killallEquipSfx);
-  killlallsEquipped += 1;
+  killallsEquipped += 1;
 }
 
 function equipFreeze(freeze){
@@ -1669,7 +1695,7 @@ function equipFreeze(freeze){
 
 /// POWERUP EXECUTION
 function doKillall(){
-  if(killlallsEquipped > 0 && gameState === PLAYING){
+  if(killallsEquipped > 0 && gameState === PLAYING){
     if(sfxOn) playSound(killallSfx);
 
     scoreBeforeKillall = score;
@@ -1682,7 +1708,7 @@ function doKillall(){
     // they wont be removed from the copy
     for (const enemyList of [enemyGroup.slice(), bigEnemyGroup.slice()]){
       for (const enemy of enemyList){
-        for (let i = 0; i < 3; i++){
+        for (let i = 0; i < 4; i++){
           if (damageEnemy(enemy, null) != null) break;
         }
       }
@@ -1696,7 +1722,7 @@ function doKillall(){
     }
 
     score = scoreBeforeKillall;
-    killlallsEquipped -= 1;
+    killallsEquipped -= 1;
   }
 }
 
@@ -1821,7 +1847,7 @@ function startGame(seed){
 
   player = createSprite(canvasWidth / 2, canvasHeight / 2, playerWidth, playerHeight); 
   player.addImage(playerImage);
-  player.setCollider("circle", 0, 5, playerWidth / 2);
+  player.setCollider("circle", 0, 5, playerWidth / 2.2);
   player.debug = debugSprites;
   player.depth = 2;
   players.add(player);
