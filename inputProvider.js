@@ -66,7 +66,7 @@ class InputProvider {
 
     _convertInputs(internalInputs){
         if (!internalInputs) return null;
-        
+
         let numKeysPressed = 0;
         for (let i = 2; i < internalInputs.length; i++){
             if (typeof internalInputs[i] === "string"){
@@ -113,6 +113,12 @@ class InputProvider {
         }
 
         const currentInputs = this._convertInputs(replayData[frame]);
+        if (!currentInputs){
+            return {
+                mouse: false,
+                keys: []
+            }
+        }
         const prevInputs = this._convertInputs(replayData[frame - 1]);
 
         const newKeys = [];
