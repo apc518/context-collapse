@@ -342,34 +342,39 @@ function draw(){
     document.getElementById("volumeSlider").disabled = true;
     const pressEvents = inputProvider.getPressEventsByGameFrame(gameFrame);
     const currentInputs = inputProvider.getInputsByGameFrame(gameFrame);
-    for (const k of pressEvents.keys){
-      doKeyPressedAction(k);
+    if (!currentInputs){
+      gameOver();
     }
-    if (pressEvents.mouse){
-      doMousePressedAction(currentInputs.mousePosition.x, currentInputs.mousePosition.y);
+    else{
+      for (const k of pressEvents.keys){
+        doKeyPressedAction(k);
+      }
+      if (pressEvents.mouse){
+        doMousePressedAction(currentInputs.mousePosition.x, currentInputs.mousePosition.y);
+      }
+  
+      spawnMonster();
+      spawnArrowBunch();
+      spawnHealthPack();
+      spawnKillallAbility();
+      spawnFreezeAbility();
+      playerControls(currentInputs);
+      collisions();
+      attractMonsters();
+      attractProjectiles();
+      shootSocks();
+      _drawSprites();
+      assignImages();
+      drawPowerups();
+      drawStats();
+      noCursor();
+      drawCursor(currentInputs);
+      cleanup();
+      drawSafeFromSpawningArea();
+      drawReplayIndicator();
+      if(freezeTimer === 0) freezing = false;
+      gameFrame++;
     }
-
-    spawnMonster();
-    spawnArrowBunch();
-    spawnHealthPack();
-    spawnKillallAbility();
-    spawnFreezeAbility();
-    playerControls();
-    collisions();
-    attractMonsters();
-    attractProjectiles();
-    shootSocks();
-    _drawSprites();
-    assignImages();
-    drawPowerups();
-    drawStats();
-    noCursor();
-    drawCursor();
-    cleanup();
-    drawSafeFromSpawningArea();
-    drawReplayIndicator();
-    if(freezeTimer === 0) freezing = false;
-    gameFrame++;
   }
   else if(gameState === PAUSED){ // includes game over
     pauseMonsters();
@@ -930,10 +935,9 @@ function drawPauseScreen(){
   restartBtn.draw();
 }
 
-function drawCursor(){
+function drawCursor(currentInputs){
   push();
   imageMode(CENTER);
-  const currentInputs = inputProvider.getInputsByGameFrame(gameFrame);
   image(crosshairImage, currentInputs.mousePosition.x, currentInputs.mousePosition.y, 48, 48);
   pop();
 }
@@ -1106,10 +1110,9 @@ function assignImages(){
 
 
 /// PLAYER CONTROLS
-function incrementVelocity(){
+function incrementVelocity(currentInputs){
   let x = 0;
   let y = 0;
-  const currentInputs = inputProvider.getInputsByGameFrame(gameFrame);
   // create a unit vector from pressed keys
   if(currentInputs.keysPressed.includes("w")){
     y -= 1;
@@ -1140,7 +1143,7 @@ function incrementVelocity(){
   playerSpeedY -= playerFriction * playerSpeedY;
 }
 
-function playerControls(){
+function playerControls(currentInputs){
   // this functions handles the players movement
   // handle border
   if(player.position.y > canvasHeight - playerWidth/2){
@@ -1156,7 +1159,7 @@ function playerControls(){
     player.position.x = canvasWidth - playerWidth/2;
   }
 
-  incrementVelocity();
+  incrementVelocity(currentInputs);
 
   player.position.x += playerSpeedX;
   player.position.y += playerSpeedY;
@@ -1826,6 +1829,7 @@ function setGameState(newState){
   oldState = gameState;
   gameState = newState;
   if (oldState === PLAYING && newState === PAUSED){
+    console.log(player.position.x, player.position.y);
     cacheVelocities();
   }
   else if (oldState === PAUSED && newState === PLAYING){

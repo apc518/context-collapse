@@ -65,6 +65,8 @@ class InputProvider {
     }
 
     _convertInputs(internalInputs){
+        if (!internalInputs) return null;
+        
         let numKeysPressed = 0;
         for (let i = 2; i < internalInputs.length; i++){
             if (typeof internalInputs[i] === "string"){
