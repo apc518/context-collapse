@@ -28,7 +28,7 @@ const globalFont = "Trebuchet MS";
 
 // rng
 let gameSeed;
-let rng; // a function produced by mulberry32()
+let uniformRng; // a function produced by mulberry32()
 
 // recording
 /**
@@ -77,14 +77,14 @@ let enemyGroup;
 let bigEnemyGroup;
 let bossGroup;
 
-const monsterAccelerationVariance = 0.2;
-const monsterMaxSpeedVariance = 0.2;
+const monsterAccelerationVariance = 0.8;
+const monsterMaxSpeedVariance = 0.8;
 
 const bossValue = 50;
 const bossSpawnScoreDefault = 100;
 const bossSpawnScoreInterval = 200;
 let bossSpawnScore = bossSpawnScoreDefault;
-const sockSpeed = 7;
+const sockSpeed = 11;
 
 const bigEnemyHealthMax = 80;
 const enemyHealthMax = 20;
@@ -353,7 +353,7 @@ function draw(){
         doMousePressedAction(currentInputs.mousePosition.x, currentInputs.mousePosition.y);
       }
   
-      spawnMonster();
+      // spawnMonster();
       spawnArrowBunch();
       spawnHealthPack();
       spawnKillallAbility();
@@ -1172,17 +1172,14 @@ function attractMonsters(){
     for(var i = 0; i < enemyGroup.length; i++){
       monster = enemyGroup[i];
       monster.attractionPoint(monster.tag.acceleration, player.position.x, player.position.y);
-      monster.maxSpeed = monster.tag.maxSpeed;
     }
     for(var i = 0; i < bigEnemyGroup.length; i++){
       monster = bigEnemyGroup[i];
       monster.attractionPoint(monster.tag.acceleration, player.position.x, player.position.y);
-      monster.maxSpeed = monster.tag.maxSpeed;
     }
     for(let i = 0; i < bossGroup.length; i++){
       monster = bossGroup[i];
       monster.attractionPoint(0.01, player.position.x, player.position.y);
-      monster.maxSpeed = 0.5;
     }
   }
 }
@@ -1359,11 +1356,16 @@ function mulberry32(a) {
   }
 }
 
+// returns values from 0 to 1, but is more likely to return values closer to 0.5
+function cubicRandom(){
+  return (1 + Math.pow(2*uniformRng() - 1, 3)) / 2
+}
+
 
 /// SPAWNING
 function spawnKillallAbility(){
   if(killallAbilityPrevSpawn + killallSpawnPeriod <= gameFrame){
-    var killallAbility = createSprite(rng() * canvasWidth, rng() * canvasHeight);
+    var killallAbility = createSprite(uniformRng() * canvasWidth, uniformRng() * canvasHeight);
     killallAbility.addImage(killallAbilityImage);
     killallAbility.setCollider("rectangle", 0, 0, 96, 96);
     killallAbility.debug = debugSprites;
@@ -1376,7 +1378,7 @@ function spawnKillallAbility(){
 
 function spawnFreezeAbility(){
   if(freezePrevSpawn + freezeSpawnPeriod <= gameFrame){
-    var freeze = createSprite(rng() * canvasWidth, rng() * canvasHeight);
+    var freeze = createSprite(uniformRng() * canvasWidth, uniformRng() * canvasHeight);
     freeze.addImage(freezeAbilityImage);
     freeze.setCollider("rectangle", 0, 0, 96, 96);
     freeze.debug = debugSprites;
@@ -1389,7 +1391,7 @@ function spawnFreezeAbility(){
 
 function spawnHealthPack(){
   if(healthPackPrevSpawn + healthPackSpawnPeriod <= gameFrame && healthPackEmbargo <= gameFrame){
-    var healthPack = createSprite(rng() * canvasWidth, rng() * canvasHeight);
+    var healthPack = createSprite(uniformRng() * canvasWidth, uniformRng() * canvasHeight);
     healthPack.addImage(healthPackImage);
     healthPack.setCollider("rectangle", 0, 0, 128, 128);
     healthPack.debug = debugSprites;
@@ -1397,14 +1399,14 @@ function spawnHealthPack(){
     healthPacks.add(healthPack);
 
     healthPackPrevSpawn = gameFrame;
-    healthPackSpawnPeriod = healthPackSpawnPeriodAverage + rng() * 2 * healthPackSpawnVariance + healthPackSpawnVariance;
+    healthPackSpawnPeriod = healthPackSpawnPeriodAverage + uniformRng() * 2 * healthPackSpawnVariance + healthPackSpawnVariance;
   }
 }
 
 function spawnArrowBunch(){
   if(gameFrame === arrowBunchSpawnFrame){
     if(arrowBunches.length < 6){
-      var arrowBunch = createSprite(rng() * canvasWidth, rng() * canvasHeight);
+      var arrowBunch = createSprite(uniformRng() * canvasWidth, uniformRng() * canvasHeight);
       arrowBunch.addImage(arrowBunchImage);
       arrowBunch.setCollider("rectangle", 0, 0, 64, 64);
       arrowBunch.debug = debugSprites;
@@ -1420,8 +1422,8 @@ function spawnMonster(force){
   if(force || (enemySpawnFrame <= gameFrame && !freezing)){
     // create a random vector pointing out from the player, length half of the canvasWidth
     
-    var length = rng() * (canvasWidth / 2 - safeRadius) + safeRadius; // hypotenuse
-    var theta = rng() * 2 * Math.PI;
+    var length = uniformRng() * (canvasWidth / 2 - safeRadius) + safeRadius; // hypotenuse
+    var theta = uniformRng() * 2 * Math.PI;
 
     var x_ = Math.cos(theta) * length;
     var y_ = Math.sin(theta) * length;
@@ -1459,18 +1461,19 @@ function createMonster(x, y){
     monster.setCollider("circle", 0, 0, 135);
     monster.tag = new MetaObj(health=endlessSettings.bossHealthMax, strength=200, value=bossValue);
     monster.tag.isBoss = true;
+    monster.maxSpeed = 0.5;
     bossGroup.add(monster);
     monster.scale = 1.4;
     bossSpawnScore += bossSpawnScoreInterval;
     bossCount += 1;
   }
-  else if(rng() > endlessSettings.bigEnemyRate && (bossCount > 1 || !bossIsAlive())){
+  else if(uniformRng() > endlessSettings.bigEnemyRate && (bossCount > 1 || !bossIsAlive())){
     // normal monster
     monster.addImage(enemyImage);
     monster.setCollider("rectangle", 0, 0, 38, 50);
     monster.tag = new MetaObj(health=enemyHealthMax, strength=10);
-    monster.tag.acceleration = endlessSettings.smallMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
-    monster.tag.maxSpeed = endlessSettings.smallMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
+    monster.tag.acceleration = endlessSettings.smallMonsterAcceleration * (1 + cubicRandom() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
+    monster.maxSpeed = endlessSettings.smallMonsterMaxSpeed * (1 + cubicRandom() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
     enemyGroup.add(monster);
   }
   else if (bossCount > 2 || !bossIsAlive()){
@@ -1479,8 +1482,8 @@ function createMonster(x, y){
     monster.scale = 0.5;
     monster.setCollider("circle", 0, -3, 110);
     monster.tag = new MetaObj(health=bigEnemyHealthMax, strength=30, value=3, bigEnemy=true);
-    monster.tag.acceleration = endlessSettings.bigMonsterAcceleration * (1 + rng() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
-    monster.tag.maxSpeed = endlessSettings.bigMonsterMaxSpeed * (1 + rng() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
+    monster.tag.acceleration = endlessSettings.bigMonsterAcceleration * (1 + cubicRandom() * monsterAccelerationVariance - (monsterAccelerationVariance / 2));
+    monster.maxSpeed = endlessSettings.bigMonsterMaxSpeed * (1 + cubicRandom() * monsterMaxSpeedVariance - (monsterMaxSpeedVariance / 2));
     bigEnemyGroup.add(monster);
   }
 }
@@ -1504,7 +1507,7 @@ function shootSocks() {
   if (gameFrame >= sockShootingFrame){
     if (sfxOn) playSound(sockSfx);
     const bossPos = [bossGroup[0].position.x, bossGroup[0].position.y];
-    const theta = atan((player.position.y - bossPos[1]) / (player.position.x - bossPos[0])) + rng() * sockTargetSpread - (sockTargetSpread / 2) + (player.position.x < bossPos[0] ? PI : 0);
+    const theta = atan((player.position.y - bossPos[1]) / (player.position.x - bossPos[0])) + cubicRandom() * sockTargetSpread - (sockTargetSpread / 2) + (player.position.x < bossPos[0] ? PI : 0);
     const sockTarget = [bossPos[0] + cos(theta), bossPos[1] + sin(theta)];
 
     let sock = createSprite(...bossPos);
@@ -1545,13 +1548,16 @@ function shootSocks() {
 
 function pauseMonsters(){
   for(var i = 0; i < enemyGroup.length; i++){
-    enemyGroup[i].maxSpeed = 0;
+    enemyGroup[i].velocity.x = 0;
+    enemyGroup[i].velocity.y = 0;
   }
   for(var i = 0; i < bigEnemyGroup.length; i++){
-    bigEnemyGroup[i].maxSpeed = 0;
+    bigEnemyGroup[i].velocity.x = 0;
+    bigEnemyGroup[i].velocity.y = 0;
   }
   for(var i = 0; i < bossGroup.length; i++){
-    bossGroup[i].maxSpeed = 0;
+    bossGroup[i].velocity.x = 0;
+    bossGroup[i].velocity.y = 0;
   }
 }
 
@@ -1811,7 +1817,7 @@ function registerGame(){
 
 function startGame(seed){
   gameSeed = seed;
-  rng = mulberry32(gameSeed);
+  uniformRng = mulberry32(gameSeed);
 
   player = createSprite(canvasWidth / 2, canvasHeight / 2, playerWidth, playerHeight); 
   player.addImage(playerImage);
@@ -1829,7 +1835,6 @@ function setGameState(newState){
   oldState = gameState;
   gameState = newState;
   if (oldState === PLAYING && newState === PAUSED){
-    console.log(player.position.x, player.position.y);
     cacheVelocities();
   }
   else if (oldState === PAUSED && newState === PLAYING){
